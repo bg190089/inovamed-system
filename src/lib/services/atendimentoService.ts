@@ -74,7 +74,7 @@ export class AtendimentoService {
       .update({
         status: 'em_atendimento',
         hora_fim_atendimento: null,
-        reabertura_count: this.supabase.rpc ? undefined : 0,
+        // reabertura_count is incremented via RPC below
         ultima_reabertura: new Date().toISOString(),
       })
       .eq('id', id);
