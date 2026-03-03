@@ -102,6 +102,7 @@ export function generateBPAFilename(municipio: string, competencia: string): str
 // Status colors
 export function getStatusColor(status: string): string {
   const colors: Record<string, string> = {
+    aguardando_triagem: 'bg-purple-100 text-purple-800',
     aguardando: 'bg-amber-100 text-amber-800',
     em_atendimento: 'bg-blue-100 text-blue-800',
     finalizado: 'bg-emerald-100 text-emerald-800',
@@ -112,6 +113,7 @@ export function getStatusColor(status: string): string {
 
 export function getStatusLabel(status: string): string {
   const labels: Record<string, string> = {
+    aguardando_triagem: 'Ag. Triagem',
     aguardando: 'Aguardando',
     em_atendimento: 'Em Atendimento',
     finalizado: 'Finalizado',

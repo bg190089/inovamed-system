@@ -5,7 +5,7 @@
 export type UserRole = 'admin' | 'gestor' | 'medico' | 'recepcionista';
 export type SexoType = 'M' | 'F';
 export type ProcedimentoTipo = 'unilateral' | 'bilateral';
-export type AtendimentoStatus = 'aguardando' | 'em_atendimento' | 'finalizado' | 'cancelado';
+export type AtendimentoStatus = 'aguardando_triagem' | 'aguardando' | 'em_atendimento' | 'finalizado' | 'cancelado';
 export type AgendamentoStatus = 'agendado' | 'confirmado' | 'cancelado' | 'realizado' | 'faltou';
 export type EmpresaTipo = 'inovamed' | 'mj';
 
@@ -109,6 +109,7 @@ export interface Atendimento {
   ultima_reabertura?: string;
   assinatura_medico?: string;
   receita?: string;
+  triagem_id?: string;
   created_at: string;
   // Relations
   paciente?: Paciente;

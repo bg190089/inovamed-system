@@ -185,10 +185,10 @@ export default function RecepcaoPage() {
         profissional_id: selectedProf, paciente_id: pacienteId,
         procedimento_id: selectedProc,
         data_atendimento: new Date().toISOString().split('T')[0],
-        status: 'aguardando',
+        status: 'aguardando_triagem',
       });
 
-      toast.success(`${form.nome_completo} adicionado(a) a fila`);
+      toast.success(`${form.nome_completo} encaminhado(a) para triagem`);
       resetAndClose(); loadFila();
     } catch (err: any) {
       toast.error(err.message || 'Erro ao registrar atendimento');
@@ -215,6 +215,7 @@ export default function RecepcaoPage() {
     setForm({ nome_completo: '', sexo: 'F', data_nascimento: '', cpf: '', cns: '', cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', uf: 'BA', telefone: '' });
   }
 
+  const aguardandoTriagem = fila.filter(f => f.status === 'aguardando_triagem');
   const aguardando = fila.filter(f => f.status === 'aguardando');
   const emAtendimento = fila.filter(f => f.status === 'em_atendimento');
   const finalizados = fila.filter(f => f.status === 'finalizado');
@@ -236,9 +237,10 @@ export default function RecepcaoPage() {
       />
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         {[
-          { label: 'Aguardando', sublabel: 'Na fila', count: aguardando.length, bg: 'bg-amber-100', text: 'text-amber-600' },
+          { label: 'Ag. Triagem', sublabel: 'Na triagem', count: aguardandoTriagem.length, bg: 'bg-purple-100', text: 'text-purple-600' },
+          { label: 'Aguardando', sublabel: 'Fila medico', count: aguardando.length, bg: 'bg-amber-100', text: 'text-amber-600' },
           { label: 'Em atendimento', sublabel: 'No consultorio', count: emAtendimento.length, bg: 'bg-blue-100', text: 'text-blue-600' },
           { label: 'Finalizados', sublabel: 'Hoje', count: finalizados.length, bg: 'bg-emerald-100', text: 'text-emerald-600' },
         ].map((s, i) => (
