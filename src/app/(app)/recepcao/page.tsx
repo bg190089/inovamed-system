@@ -4,9 +4,11 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSupabase } from '@/hooks/useSupabase';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
-import { PacienteService, AtendimentoService } from '@/lib/services';
+import { PacienteService, AtendimentoService, DocumentoService } from '@/lib/services';
+import type { DocumentoPaciente } from '@/lib/services/documentoService';
 import { pacienteSchema } from '@/lib/validations/schemas';
 import { toast } from 'sonner';
+import QRCode from 'qrcode';
 import { maskCPF, maskCNS, maskPhone, maskCEP, unmask, formatDate, calcularIdade, getStatusColor, getStatusLabel, cn, buscarCEP } from '@/lib/utils';
 import { ConfirmDialog, EmptyState, PageHeader } from '@/components/ui';
 import type { Paciente, Atendimento, Procedimento, Profissional } from '@/types';
@@ -44,10 +46,11 @@ function getPriorityBadge(dataNascimento: string): { label: string; className: s
 }
 
 export default function RecepcaoPage() {
-  const { selectedEmpresa, selectedUnidade } = useAuth();
+  const { user, selectedEmpresa, selectedUnidade } = useAuth();
   const supabase = useSupabase();
   const pacienteService = useMemo(() => new PacienteService(supabase), [supabase]);
   const atendimentoService = useMemo(() => new AtendimentoService(supabase), [supabase]);
+  const documentoService = useMemo(() => new DocumentoService(supabase), [supabase]);
   const { state: confirmState, confirm, close: closeConfirm } = useConfirmDialog();
 
   const [fila, setFila] = useState<Atendimento[]>([]);
@@ -79,6 +82,15 @@ export default function RecepcaoPage() {
     cpf: '', cns: '', cep: '', logradouro: '', numero: '', complemento: '',
     bairro: '', cidade: '', uf: 'BA', telefone: '',
   });
+
+  const [showDocModal, setShowDocModal] = useState(false);
+  const [docPaciente, setDocPaciente] = useState<Atendimento | null>(null);
+  const [documentos, setDocumentos] = useState<DocumentoPaciente[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadTipo, setUploadTipo] = useState('tcle');
+  const [uploadDesc, setUploadDesc] = useState('');
+  const [qrUrl, setQrUrl] = useState('');
+  const [qrDataUrl, setQrDataUrl] = useState('');
 
   const loadFila = useCallback(async () => {
     if (!selectedUnidade) return;
@@ -391,6 +403,112 @@ export default function RecepcaoPage() {
     }
   }
 
+  const DOC_TYPES = [
+    { value: 'documento_pessoal', label: 'Documento Pessoal' },
+    { value: 'tcle', label: 'TCLE' },
+    { value: 'receita', label: 'Receita' },
+    { value: 'exame', label: 'Exame' },
+    { value: 'encaminhamento', label: 'Encaminhamento' },
+    { value: 'outro', label: 'Outro' },
+  ];
+
+  async function openDocModal(atend: Atendimento) {
+    if (!atend.paciente?.id) return;
+    setDocPaciente(atend);
+    setUploadTipo('tcle');
+    setUploadDesc('');
+    setQrUrl('');
+    setQrDataUrl('');
+    try {
+      const docs = await documentoService.getByPaciente(atend.paciente.id);
+      setDocumentos(docs);
+    } catch (err) {
+      console.error(err);
+      toast.error('Erro ao carregar documentos');
+    }
+    setShowDocModal(true);
+  }
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !docPaciente?.paciente?.id) return;
+
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'application/pdf'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Apenas JPG e PDF sao permitidos');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const doc = await documentoService.upload(
+        file,
+        docPaciente.paciente.id,
+        uploadTipo,
+        uploadDesc,
+        selectedUnidade?.id,
+        selectedEmpresa?.id
+      );
+      setDocumentos([doc, ...documentos]);
+      setUploadDesc('');
+      toast.success('Documento enviado com sucesso');
+      e.target.value = '';
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao enviar documento');
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function handleDeleteDoc(doc: DocumentoPaciente) {
+    confirm({
+      title: 'Deletar Documento',
+      description: `Tem certeza que deseja deletar "${doc.nome_arquivo}"? Esta acao nao pode ser desfeita.`,
+      variant: 'danger',
+      confirmLabel: 'Sim, Deletar',
+      onConfirm: async () => {
+        try {
+          await documentoService.delete(doc.id, doc.storage_path);
+          setDocumentos(documentos.filter(d => d.id !== doc.id));
+          toast.success('Documento deletado');
+          closeConfirm();
+        } catch (err: any) {
+          toast.error(err.message || 'Erro ao deletar');
+        }
+      },
+    });
+  }
+
+  async function handleViewDoc(doc: DocumentoPaciente) {
+    try {
+      const url = await documentoService.getSignedUrl(doc.storage_path);
+      window.open(url, '_blank');
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao abrir documento');
+    }
+  }
+
+  async function generateQR() {
+    if (!docPaciente?.paciente?.id || !user?.id) return;
+    try {
+      const token = `${Date.now()}-${Math.random()}`;
+      const params = new URLSearchParams({
+        token,
+        paciente: docPaciente.paciente.id,
+        unidade: selectedUnidade?.id || '',
+        profissional: docPaciente.profissional_id || '',
+        tipo: uploadTipo,
+      });
+      const uploadQRUrl = `${window.location.origin}/upload-qr?${params.toString()}`;
+      const dataUrl = await QRCode.toDataURL(uploadQRUrl, { width: 256 });
+      setQrUrl(uploadQRUrl);
+      setQrDataUrl(dataUrl);
+      toast.success('QR code gerado');
+    } catch (err) {
+      toast.error('Erro ao gerar QR code');
+    }
+  }
+
   const aguardandoTriagem = fila.filter(f => f.status === 'aguardando_triagem');
   const aguardando = fila.filter(f => f.status === 'aguardando');
   const emAtendimento = fila.filter(f => f.status === 'em_atendimento');
@@ -487,6 +605,9 @@ export default function RecepcaoPage() {
                       <td className="px-4 py-3 text-center"><span className={`badge ${getStatusColor(atend.status)}`}>{getStatusLabel(atend.status)}</span></td>
                       <td className="px-4 py-3 text-center">
                         <div className="flex items-center justify-center gap-1">
+                          <button onClick={() => openDocModal(atend)} className="text-surface-500 hover:text-brand-600 transition-colors" title="Documentos">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                          </button>
                           {canEditPatient(atend.status) && (
                             <button onClick={() => openEditModal(atend)} className="text-brand-500 hover:text-brand-700 transition-colors" title="Editar dados">
                               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
@@ -565,6 +686,9 @@ export default function RecepcaoPage() {
                       </div>
 
                       <div className="flex gap-2 pt-2 border-t border-surface-100">
+                        <button onClick={() => openDocModal(atend)} className="flex-1 text-sm px-3 py-2 text-surface-600 hover:bg-surface-50 rounded-lg transition-colors font-medium">
+                          Documentos
+                        </button>
                         {canEditPatient(atend.status) && (
                           <button onClick={() => openEditModal(atend)} className="flex-1 text-sm px-3 py-2 text-brand-600 hover:bg-brand-50 rounded-lg transition-colors font-medium">
                             Editar
@@ -665,6 +789,96 @@ export default function RecepcaoPage() {
       <ConfirmDialog open={confirmState.open} title={confirmState.title} description={confirmState.description}
         variant={confirmState.variant} confirmLabel={confirmState.confirmLabel}
         onConfirm={confirmState.onConfirm} onCancel={closeConfirm} />
+
+      {/* Documents Modal */}
+      {showDocModal && docPaciente && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-start justify-center p-4 pt-4 overflow-y-auto md:pt-12">
+          <div className="bg-white rounded-2xl shadow-elevated max-w-2xl w-full mb-8 min-h-screen md:min-h-auto md:rounded-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-surface-100 sticky top-0 bg-white rounded-t-2xl z-10">
+              <h2 className="text-lg font-display font-bold text-surface-900">Documentos - {docPaciente.paciente?.nome_completo}</h2>
+              <button onClick={() => setShowDocModal(false)} className="p-2 rounded-lg hover:bg-surface-100">
+                <svg className="w-5 h-5 text-surface-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="p-6 space-y-6">
+              {/* Upload Section */}
+              <div className="border border-surface-200 rounded-lg p-4 space-y-3">
+                <h3 className="font-semibold text-surface-800">Enviar Documento</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="input-label">Tipo de Documento</label>
+                    <select value={uploadTipo} onChange={(e) => setUploadTipo(e.target.value)} className="input-field">
+                      {DOC_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="input-label">Descricao (Opcional)</label>
+                    <input type="text" value={uploadDesc} onChange={(e) => setUploadDesc(e.target.value)} className="input-field" placeholder="Ex: Comprovante de residencia..." />
+                  </div>
+                </div>
+                <div>
+                  <label className="input-label">Arquivo (JPG, PDF)</label>
+                  <input type="file" accept=".jpg,.jpeg,.pdf" onChange={handleFileUpload} disabled={uploading} className="input-field cursor-pointer" />
+                </div>
+              </div>
+
+              {/* QR Code Section */}
+              <div className="border border-surface-200 rounded-lg p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-surface-800">Upload via QR Code</h3>
+                  <button onClick={generateQR} className="text-sm btn-secondary">Gerar QR Code</button>
+                </div>
+                {qrDataUrl && (
+                  <div className="flex flex-col items-center gap-3 bg-surface-50 p-4 rounded-lg">
+                    <img src={qrDataUrl} alt="QR Code" className="w-48 h-48" />
+                    <p className="text-xs text-surface-500 text-center">Aponte a câmera do telefone para fazer upload</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Documents List Section */}
+              <div className="space-y-3">
+                <h3 className="font-semibold text-surface-800">Documentos do Paciente ({documentos.length})</h3>
+                {documentos.length === 0 ? (
+                  <div className="text-center py-6 bg-surface-50 rounded-lg">
+                    <p className="text-sm text-surface-500">Nenhum documento enviado</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {documentos.map((doc) => (
+                      <div key={doc.id} className="border border-surface-200 rounded-lg p-3 flex items-center justify-between hover:bg-surface-50 transition-colors">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-surface-800">{doc.nome_arquivo}</p>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            <span className="badge bg-surface-100 text-surface-700 text-xs">
+                              {DOC_TYPES.find(t => t.value === doc.tipo)?.label || doc.tipo}
+                            </span>
+                            {doc.descricao && (
+                              <span className="text-xs text-surface-500">{doc.descricao}</span>
+                            )}
+                            <span className="text-xs text-surface-400">{formatDate(doc.created_at, 'dd/MM/yyyy HH:mm')}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                          <button onClick={() => handleViewDoc(doc)} className="text-brand-500 hover:text-brand-700 transition-colors p-2" title="Visualizar">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                          </button>
+                          <button onClick={() => handleDeleteDoc(doc)} className="text-red-500 hover:text-red-700 transition-colors p-2" title="Deletar">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-surface-100 flex justify-end gap-3 sticky bottom-0 bg-white rounded-b-2xl">
+              <button onClick={() => setShowDocModal(false)} className="btn-secondary">Fechar</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Edit Patient Modal */}
       {showEditModal && editingAtendimento && (
