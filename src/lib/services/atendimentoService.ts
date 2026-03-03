@@ -79,13 +79,12 @@ export class AtendimentoService {
       })
       .eq('id', id);
     if (error) throw new Error(error.message);
-    // Increment reabertura_count via raw update
-    await this.supabase.rpc('incrementar_reabertura', { p_atendimento_id: id }).catch(() => {
-      // Fallback: direct update if RPC doesn't exist
-      this.supabase.from('atendimentos').update({
-        ultima_reabertura: new Date().toISOString()
-      }).eq('id', id);
-    });
+    // Try to increment reabertura_count via RPC
+    try {
+      await this.supabase.rpc('incrementar_reabertura', { p_atendimento_id: id });
+    } catch {
+      // RPC may not exist yet — ignore
+    }
   }
 
   async contarSessoes12Meses(pacienteId: string): Promise<number> {
