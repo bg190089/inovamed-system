@@ -285,27 +285,26 @@ export default function ConsultorioPage() {
 
   // Generate PDF of the prontuario
   async function gerarPDFProntuario(atend: Atendimento) {
-    // Fetch doctor signature
+    // Fetch doctor signature + info via RPC (SECURITY DEFINER bypasses RLS)
     let assinaturaBase64 = atend.assinatura_medico || '';
-    if (!assinaturaBase64 && user) {
-      const { data: profData } = await supabase
-        .from('profissionais')
-        .select('assinatura_digital, nome_completo')
-        .eq('id', user.id)
-        .single();
-      if (profData?.assinatura_digital) assinaturaBase64 = profData.assinatura_digital;
+    let nomeProf = user?.nome_completo || 'Medico';
+    let cboProf = '';
+    let cnsProf = '';
+
+    const profId = atend.profissional_id || user?.id;
+    if (profId) {
+      const { data: profData } = await supabase.rpc('get_assinatura_profissional', {
+        p_profissional_id: profId,
+      });
+      if (profData && profData.length > 0) {
+        if (!assinaturaBase64 && profData[0].assinatura_digital) {
+          assinaturaBase64 = profData[0].assinatura_digital;
+        }
+        nomeProf = profData[0].nome_completo || nomeProf;
+        cboProf = profData[0].cbo || '';
+        cnsProf = profData[0].cns || '';
+      }
     }
-
-    // Fetch doctor info
-    const { data: profInfo } = await supabase
-      .from('profissionais')
-      .select('nome_completo, cbo, cns')
-      .eq('id', atend.profissional_id)
-      .single();
-
-    const nomeProf = profInfo?.nome_completo || user?.nome_completo || 'Medico';
-    const cboProf = profInfo?.cbo || '';
-    const cnsProf = profInfo?.cns || '';
     const unidadeNome = (selectedUnidade as any)?.municipio?.nome || '';
     const cnesUnidade = (selectedUnidade as any)?.cnes || '';
     const pacNome = atend.paciente?.nome_completo || '';
