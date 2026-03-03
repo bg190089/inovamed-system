@@ -99,6 +99,31 @@ export function generateBPAFilename(municipio: string, competencia: string): str
   return `BPA_${nome}_${competencia}.xlsx`;
 }
 
+// ViaCEP lookup
+export interface ViaCEPResult {
+  cep: string;
+  logradouro: string;
+  complemento: string;
+  bairro: string;
+  localidade: string;
+  uf: string;
+  erro?: boolean;
+}
+
+export async function buscarCEP(cep: string): Promise<ViaCEPResult | null> {
+  const nums = cep.replace(/\D/g, '');
+  if (nums.length !== 8) return null;
+  try {
+    const res = await fetch(`https://viacep.com.br/ws/${nums}/json/`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.erro) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
 // Status colors
 export function getStatusColor(status: string): string {
   const colors: Record<string, string> = {

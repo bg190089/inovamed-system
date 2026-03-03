@@ -19,6 +19,13 @@ export class PacienteService {
     return data;
   }
 
+  async getByCNS(cns: string): Promise<Paciente | null> {
+    const clean = cns.replace(/\D/g, '');
+    if (clean.length !== 15) return null;
+    const { data } = await this.supabase.from('pacientes').select('*').eq('cns', clean).maybeSingle();
+    return data;
+  }
+
   async criar(paciente: Partial<Paciente>): Promise<Paciente> {
     const { data, error } = await this.supabase.from('pacientes').insert(paciente).select().single();
     if (error) throw new Error(error.message);

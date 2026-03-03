@@ -7,7 +7,7 @@ import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { PacienteService, AtendimentoService } from '@/lib/services';
 import { pacienteSchema } from '@/lib/validations/schemas';
 import { toast } from 'sonner';
-import { maskCPF, maskCNS, maskPhone, maskCEP, unmask, formatDate, calcularIdade, getStatusColor, getStatusLabel, cn } from '@/lib/utils';
+import { maskCPF, maskCNS, maskPhone, maskCEP, unmask, formatDate, calcularIdade, getStatusColor, getStatusLabel, cn, buscarCEP } from '@/lib/utils';
 import { ConfirmDialog, EmptyState, PageHeader } from '@/components/ui';
 import type { Paciente, Atendimento, Procedimento, Profissional } from '@/types';
 
@@ -70,6 +70,9 @@ export default function RecepcaoPage() {
     cpf: '', cns: '', cep: '', logradouro: '', numero: '', complemento: '',
     bairro: '', cidade: '', uf: 'BA', telefone: '',
   });
+  const [buscandoCEP, setBuscandoCEP] = useState(false);
+  const [buscandoCEPEdit, setBuscandoCEPEdit] = useState(false);
+  const [buscandoPacienteCPF, setBuscandoPacienteCPF] = useState(false);
 
   const [form, setForm] = useState({
     nome_completo: '', sexo: 'F' as 'M' | 'F', data_nascimento: '',
@@ -280,6 +283,112 @@ export default function RecepcaoPage() {
     } catch (err: any) {
       toast.error(err.message || 'Erro ao atualizar');
     } finally { setLoading(false); }
+  }
+
+  // CEP auto-fill for new patient form
+  async function handleCEPChange(cepValue: string) {
+    const masked = maskCEP(cepValue);
+    setForm(prev => ({ ...prev, cep: masked }));
+    const nums = cepValue.replace(/\D/g, '');
+    if (nums.length === 8) {
+      setBuscandoCEP(true);
+      const result = await buscarCEP(nums);
+      if (result) {
+        setForm(prev => ({
+          ...prev,
+          logradouro: result.logradouro || prev.logradouro,
+          bairro: result.bairro || prev.bairro,
+          cidade: result.localidade || prev.cidade,
+          uf: result.uf || prev.uf,
+          complemento: result.complemento || prev.complemento,
+        }));
+        toast.success('Endereco preenchido pelo CEP');
+      }
+      setBuscandoCEP(false);
+    }
+  }
+
+  // CEP auto-fill for edit modal
+  async function handleCEPChangeEdit(cepValue: string) {
+    const masked = maskCEP(cepValue);
+    setEditForm(prev => ({ ...prev, cep: masked }));
+    const nums = cepValue.replace(/\D/g, '');
+    if (nums.length === 8) {
+      setBuscandoCEPEdit(true);
+      const result = await buscarCEP(nums);
+      if (result) {
+        setEditForm(prev => ({
+          ...prev,
+          logradouro: result.logradouro || prev.logradouro,
+          bairro: result.bairro || prev.bairro,
+          cidade: result.localidade || prev.cidade,
+          uf: result.uf || prev.uf,
+          complemento: result.complemento || prev.complemento,
+        }));
+        toast.success('Endereco preenchido pelo CEP');
+      }
+      setBuscandoCEPEdit(false);
+    }
+  }
+
+  // CPF auto-lookup for new patient form (pulls existing patient data)
+  async function handleCPFChangeNewPatient(cpfValue: string) {
+    const masked = maskCPF(cpfValue);
+    setForm(prev => ({ ...prev, cpf: masked }));
+    const nums = cpfValue.replace(/\D/g, '');
+    if (nums.length === 11) {
+      setBuscandoPacienteCPF(true);
+      const existing = await pacienteService.getByCPF(nums);
+      if (existing) {
+        setForm(prev => ({
+          ...prev,
+          nome_completo: existing.nome_completo || prev.nome_completo,
+          sexo: existing.sexo || prev.sexo,
+          data_nascimento: existing.data_nascimento || prev.data_nascimento,
+          cns: maskCNS(existing.cns || '') || prev.cns,
+          telefone: maskPhone(existing.telefone || '') || prev.telefone,
+          cep: maskCEP(existing.cep || '') || prev.cep,
+          logradouro: existing.logradouro || prev.logradouro,
+          numero: existing.numero || prev.numero,
+          complemento: existing.complemento || prev.complemento,
+          bairro: existing.bairro || prev.bairro,
+          cidade: existing.cidade || prev.cidade,
+          uf: existing.uf || prev.uf,
+        }));
+        toast.success('Paciente encontrado! Dados preenchidos automaticamente.');
+      }
+      setBuscandoPacienteCPF(false);
+    }
+  }
+
+  // CNS auto-lookup for new patient form
+  async function handleCNSChangeNewPatient(cnsValue: string) {
+    const masked = maskCNS(cnsValue);
+    setForm(prev => ({ ...prev, cns: masked }));
+    const nums = cnsValue.replace(/\D/g, '');
+    if (nums.length === 15) {
+      setBuscandoPacienteCPF(true);
+      const existing = await pacienteService.getByCNS(nums);
+      if (existing) {
+        setForm(prev => ({
+          ...prev,
+          nome_completo: existing.nome_completo || prev.nome_completo,
+          sexo: existing.sexo || prev.sexo,
+          data_nascimento: existing.data_nascimento || prev.data_nascimento,
+          cpf: maskCPF(existing.cpf || '') || prev.cpf,
+          telefone: maskPhone(existing.telefone || '') || prev.telefone,
+          cep: maskCEP(existing.cep || '') || prev.cep,
+          logradouro: existing.logradouro || prev.logradouro,
+          numero: existing.numero || prev.numero,
+          complemento: existing.complemento || prev.complemento,
+          bairro: existing.bairro || prev.bairro,
+          cidade: existing.cidade || prev.cidade,
+          uf: existing.uf || prev.uf,
+        }));
+        toast.success('Paciente encontrado pelo Cartao SUS! Dados preenchidos.');
+      }
+      setBuscandoPacienteCPF(false);
+    }
   }
 
   const aguardandoTriagem = fila.filter(f => f.status === 'aguardando_triagem');
@@ -600,7 +709,10 @@ export default function RecepcaoPage() {
                 </div>
                 <div>
                   <label className="input-label">CEP</label>
-                  <input type="text" value={editForm.cep} onChange={(e) => setEditForm({ ...editForm, cep: maskCEP(e.target.value) })} className="input-field" maxLength={9} />
+                  <div className="relative">
+                    <input type="text" value={editForm.cep} onChange={(e) => handleCEPChangeEdit(e.target.value)} className="input-field" placeholder="00000-000" maxLength={9} />
+                    {buscandoCEPEdit && <div className="absolute right-3 top-3 w-4 h-4 border-2 border-brand-200 border-t-brand-600 rounded-full animate-spin" />}
+                  </div>
                 </div>
                 <div className="md:col-span-2">
                   <label className="input-label">Logradouro</label>
@@ -697,7 +809,10 @@ export default function RecepcaoPage() {
                         </div>
                         <div>
                           <label className="input-label">CPF <span className="text-red-500">*</span></label>
-                          <input type="text" value={form.cpf} onChange={(e) => setForm({ ...form, cpf: maskCPF(e.target.value) })} className="input-field" placeholder="000.000.000-00" maxLength={14} />
+                          <div className="relative">
+                            <input type="text" value={form.cpf} onChange={(e) => handleCPFChangeNewPatient(e.target.value)} className="input-field" placeholder="000.000.000-00" maxLength={14} />
+                            {buscandoPacienteCPF && <div className="absolute right-3 top-3 w-4 h-4 border-2 border-brand-200 border-t-brand-600 rounded-full animate-spin" />}
+                          </div>
                         </div>
                         <div>
                           <label className="input-label">Data Nascimento <span className="text-red-500">*</span></label>
@@ -711,15 +826,45 @@ export default function RecepcaoPage() {
                         </div>
                         <div>
                           <label className="input-label">Cartao SUS (CNS)</label>
-                          <input type="text" value={form.cns} onChange={(e) => setForm({ ...form, cns: maskCNS(e.target.value) })} className="input-field" placeholder="000 0000 0000 0000" maxLength={18} />
+                          <div className="relative">
+                            <input type="text" value={form.cns} onChange={(e) => handleCNSChangeNewPatient(e.target.value)} className="input-field" placeholder="000 0000 0000 0000" maxLength={18} />
+                            {buscandoPacienteCPF && <div className="absolute right-3 top-3 w-4 h-4 border-2 border-brand-200 border-t-brand-600 rounded-full animate-spin" />}
+                          </div>
                         </div>
                         <div>
                           <label className="input-label">Telefone</label>
                           <input type="text" value={form.telefone} onChange={(e) => setForm({ ...form, telefone: maskPhone(e.target.value) })} className="input-field" placeholder="(00) 00000-0000" maxLength={15} />
                         </div>
                         <div>
+                          <label className="input-label">CEP</label>
+                          <div className="relative">
+                            <input type="text" value={form.cep} onChange={(e) => handleCEPChange(e.target.value)} className="input-field" placeholder="00000-000" maxLength={9} />
+                            {buscandoCEP && <div className="absolute right-3 top-3 w-4 h-4 border-2 border-brand-200 border-t-brand-600 rounded-full animate-spin" />}
+                          </div>
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="input-label">Logradouro</label>
+                          <input type="text" value={form.logradouro} onChange={(e) => setForm({ ...form, logradouro: e.target.value })} className="input-field" placeholder="Rua, Avenida..." />
+                        </div>
+                        <div>
+                          <label className="input-label">Numero</label>
+                          <input type="text" value={form.numero} onChange={(e) => setForm({ ...form, numero: e.target.value })} className="input-field" placeholder="Nº" />
+                        </div>
+                        <div>
+                          <label className="input-label">Complemento</label>
+                          <input type="text" value={form.complemento} onChange={(e) => setForm({ ...form, complemento: e.target.value })} className="input-field" />
+                        </div>
+                        <div>
+                          <label className="input-label">Bairro</label>
+                          <input type="text" value={form.bairro} onChange={(e) => setForm({ ...form, bairro: e.target.value })} className="input-field" />
+                        </div>
+                        <div>
                           <label className="input-label">Cidade</label>
                           <input type="text" value={form.cidade} onChange={(e) => setForm({ ...form, cidade: e.target.value })} className="input-field" />
+                        </div>
+                        <div>
+                          <label className="input-label">UF</label>
+                          <input type="text" value={form.uf} onChange={(e) => setForm({ ...form, uf: e.target.value.toUpperCase() })} className="input-field" maxLength={2} />
                         </div>
                       </div>
                     </div>
