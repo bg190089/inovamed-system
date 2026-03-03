@@ -45,6 +45,8 @@ export default function AgendamentoPage() {
   });
 
   // Helpers
+  const fmtTime = (t?: string | null) => t ? t.substring(0, 5) : '';
+  const fmtDateLocal = (d: string) => { const [y, m, day] = d.split('-'); return `${day}/${m}/${y}`; };
   const isRetorno = (obs?: string | null) => obs?.startsWith('[RETORNO]') || obs?.startsWith('[SESSAO');
   const getSessaoLabel = (obs?: string | null, numSessao?: number | null) => {
     if (numSessao) return `Sessao ${numSessao}`;
@@ -335,7 +337,7 @@ export default function AgendamentoPage() {
     <div className="p-4 md:p-6 lg:p-8 max-w-7xl mx-auto">
       <PageHeader
         title="Agendamentos"
-        subtitle={`${(selectedUnidade as any)?.municipio?.nome || '—'} • ${formatDate(new Date(selectedDate), 'dd/MM/yyyy')}`}
+        subtitle={`${(selectedUnidade as any)?.municipio?.nome || '—'} • ${fmtDateLocal(selectedDate)}`}
         action={
           <button onClick={() => {
             resetAndClose();
@@ -442,8 +444,9 @@ export default function AgendamentoPage() {
           <div className="grid grid-cols-7 gap-1 md:gap-2 p-4 md:p-6">
             {getWeekDays(selectedDate).map((day) => {
               const dayAgendamentos = filteredWeekAgendamentos[day] || [];
-              const dayOfWeek = new Date(day).toLocaleDateString('pt-BR', { weekday: 'short' });
-              const dayNum = new Date(day).getDate();
+              const [yy, mm, dd] = day.split('-').map(Number);
+              const dayOfWeek = new Date(yy, mm - 1, dd).toLocaleDateString('pt-BR', { weekday: 'short' });
+              const dayNum = dd;
 
               return (
                 <button
@@ -517,7 +520,7 @@ export default function AgendamentoPage() {
                       </td>
                       <td className="px-4 py-3 text-sm text-surface-600">Dr(a). {agendamento.profissional?.nome_completo?.split(' ')[0]}</td>
                       <td className="px-4 py-3 text-sm text-surface-500">
-                        {agendamento.horario_inicio} {agendamento.horario_fim ? `- ${agendamento.horario_fim}` : ''}
+                        {fmtTime(agendamento.horario_inicio)} {agendamento.horario_fim ? `- ${fmtTime(agendamento.horario_fim)}` : ''}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span className={`badge ${getStatusColor(agendamento.status)}`}>{getStatusLabel(agendamento.status)}</span>
@@ -626,7 +629,7 @@ export default function AgendamentoPage() {
                   {/* Details */}
                   <div className="space-y-1 text-xs text-surface-600 bg-surface-50 p-2 rounded">
                     <div><span className="font-medium">Profissional:</span> Dr(a). {agendamento.profissional?.nome_completo?.split(' ')[0]}</div>
-                    <div><span className="font-medium">Horário:</span> {agendamento.horario_inicio} {agendamento.horario_fim ? `- ${agendamento.horario_fim}` : ''}</div>
+                    <div><span className="font-medium">Horário:</span> {fmtTime(agendamento.horario_inicio)} {agendamento.horario_fim ? `- ${fmtTime(agendamento.horario_fim)}` : ''}</div>
                   </div>
 
                   {/* Actions */}
@@ -768,7 +771,7 @@ export default function AgendamentoPage() {
                         {pacienteHistory.map((agend) => (
                           <div key={agend.id} className="text-xs p-2 bg-white rounded border border-surface-100">
                             <div className="flex items-center justify-between">
-                              <span className="font-medium text-surface-700">{formatDate(agend.data_agendamento, 'dd/MM/yyyy')} às {agend.horario_inicio}</span>
+                              <span className="font-medium text-surface-700">{fmtDateLocal(agend.data_agendamento)} às {fmtTime(agend.horario_inicio)}</span>
                               <span className={`badge text-xs ${getStatusColor(agend.status)}`}>{getStatusLabel(agend.status)}</span>
                             </div>
                             <p className="text-surface-600 mt-1">Profissional: Dr(a). {agend.profissional?.nome_completo}</p>
