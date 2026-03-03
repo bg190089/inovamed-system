@@ -42,6 +42,14 @@ export default function LoginPage() {
           <div className="absolute bottom-32 right-16 w-96 h-96 bg-medical-400 rounded-full blur-3xl" />
         </div>
         <div className="relative z-10 px-16 max-w-lg">
+          {/* LGPD Badge */}
+          <div className="flex items-center gap-2 mb-6 bg-green-900/30 border border-green-700/40 rounded-lg px-4 py-2 w-fit">
+            <svg className="w-5 h-5 text-green-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+            <span className="text-sm font-medium text-green-300">Em conformidade com a LGPD</span>
+          </div>
+
           <div className="flex items-center gap-3 mb-8">
             <div className="w-12 h-12 bg-brand-500 rounded-xl flex items-center justify-center">
               <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -58,18 +66,22 @@ export default function LoginPage() {
           </p>
           <div className="mt-12 flex items-center gap-6">
             <div className="text-center">
-              <div className="text-3xl font-bold text-white">6+</div>
-              <div className="text-sm text-brand-300">Municípios</div>
-            </div>
-            <div className="w-px h-12 bg-brand-700" />
-            <div className="text-center">
               <div className="text-3xl font-bold text-white">BPA-I</div>
               <div className="text-sm text-brand-300">Integrado</div>
             </div>
             <div className="w-px h-12 bg-brand-700" />
             <div className="text-center">
-              <div className="text-3xl font-bold text-white">LGPD</div>
-              <div className="text-sm text-brand-300">Compliant</div>
+              <div className="text-3xl font-bold text-white">SUS</div>
+              <div className="text-sm text-brand-300">Faturamento</div>
+            </div>
+            <div className="w-px h-12 bg-brand-700" />
+            <div className="text-center">
+              <div className="text-3xl font-bold text-white">
+                <svg className="w-8 h-8 mx-auto text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+              </div>
+              <div className="text-sm text-brand-300">LGPD</div>
             </div>
           </div>
         </div>

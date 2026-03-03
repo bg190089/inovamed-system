@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import type { Empresa, Unidade } from '@/types';
 import { cn } from '@/lib/utils';
@@ -10,11 +10,23 @@ export default function ContextSelector() {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<'empresa' | 'unidade'>('empresa');
 
+  // Open automatically when no selection
   useEffect(() => {
     if (!selectedEmpresa || !selectedUnidade) {
       setOpen(true);
     }
   }, [selectedEmpresa, selectedUnidade]);
+
+  // Listen for reopen event from Sidebar or other components
+  const handleReopen = useCallback(() => {
+    setStep('empresa');
+    setOpen(true);
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener('openContextSelector', handleReopen);
+    return () => window.removeEventListener('openContextSelector', handleReopen);
+  }, [handleReopen]);
 
   function handleSelectEmpresa(emp: Empresa) {
     setSelectedEmpresa(emp);
@@ -26,23 +38,42 @@ export default function ContextSelector() {
     setOpen(false);
   }
 
+  function handleClose() {
+    if (selectedEmpresa && selectedUnidade) {
+      setOpen(false);
+    }
+  }
+
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-elevated max-w-lg w-full overflow-hidden">
-        <div className="bg-brand-600 px-6 py-5">
-          <h2 className="text-xl font-display font-bold text-white">
-            {step === 'empresa' ? 'Selecione a Empresa' : 'Selecione a Unidade'}
-          </h2>
-          <p className="text-brand-200 text-sm mt-1">
-            {step === 'empresa' 
-              ? 'Escolha a empresa para este atendimento'
-              : 'Escolha o município/unidade de atendimento'}
-          </p>
+        <div className="bg-brand-600 px-6 py-5 flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-display font-bold text-white">
+              {step === 'empresa' ? 'Selecione a Empresa' : 'Selecione a Unidade'}
+            </h2>
+            <p className="text-brand-200 text-sm mt-1">
+              {step === 'empresa'
+                ? 'Escolha a empresa para este atendimento'
+                : 'Escolha o município/unidade de atendimento'}
+            </p>
+          </div>
+          {selectedEmpresa && selectedUnidade && (
+            <button
+              onClick={handleClose}
+              className="text-white/70 hover:text-white transition-colors p-1"
+              title="Fechar"
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
         </div>
 
-        <div className="p-6 space-y-3">
+        <div className="p-6 space-y-3 max-h-[60vh] overflow-y-auto">
           {step === 'empresa' ? (
             empresas.map((emp) => (
               <button
@@ -59,6 +90,14 @@ export default function ContextSelector() {
                   {emp.tipo === 'inovamed' ? 'Inovamed' : 'M&J Serviços de Saúde'}
                 </div>
                 <div className="text-sm text-surface-500 mt-0.5">{emp.cnpj}</div>
+                {selectedEmpresa?.id === emp.id && (
+                  <span className="inline-flex items-center gap-1 mt-1 text-xs text-brand-600 font-medium">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Selecionada
+                  </span>
+                )}
               </button>
             ))
           ) : (
@@ -70,7 +109,7 @@ export default function ContextSelector() {
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
-                Voltar
+                Voltar para empresas
               </button>
               {unidades.map((uni) => (
                 <button
@@ -89,6 +128,14 @@ export default function ContextSelector() {
                   <div className="text-sm text-surface-500 mt-0.5">
                     CNES: {uni.cnes}
                   </div>
+                  {selectedUnidade?.id === uni.id && (
+                    <span className="inline-flex items-center gap-1 mt-1 text-xs text-brand-600 font-medium">
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      Selecionada
+                    </span>
+                  )}
                 </button>
               ))}
             </>
@@ -98,7 +145,7 @@ export default function ContextSelector() {
         {selectedEmpresa && selectedUnidade && (
           <div className="px-6 pb-6">
             <button
-              onClick={() => setOpen(false)}
+              onClick={handleClose}
               className="btn-primary w-full"
             >
               Confirmar Seleção

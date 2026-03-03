@@ -15,7 +15,17 @@ const navigation = [
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
       </svg>
     ),
-    roles: ['admin', 'gestor'],
+    roles: ['admin', 'gestor', 'medico', 'recepcionista'],
+  },
+  {
+    name: 'Agendamento',
+    href: '/agendamento',
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      </svg>
+    ),
+    roles: ['admin', 'gestor', 'recepcionista', 'medico'],
   },
   {
     name: 'Recepção',
@@ -89,11 +99,20 @@ export default function Sidebar() {
         )}
       </div>
 
-      {/* Context selector */}
+      {/* Context selector - clickable to change */}
       {!collapsed && selectedEmpresa && (
         <div className="px-3 py-3 border-b border-surface-100">
-          <div className="bg-surface-50 rounded-lg px-3 py-2">
-            <p className="text-[10px] uppercase tracking-wider text-surface-400 font-semibold">Empresa</p>
+          <button
+            onClick={() => window.dispatchEvent(new Event('openContextSelector'))}
+            className="w-full text-left bg-surface-50 hover:bg-brand-50 rounded-lg px-3 py-2 transition-colors group cursor-pointer"
+            title="Clique para trocar empresa ou unidade"
+          >
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] uppercase tracking-wider text-surface-400 font-semibold">Empresa</p>
+              <svg className="w-3.5 h-3.5 text-surface-300 group-hover:text-brand-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
+              </svg>
+            </div>
             <p className="text-xs font-medium text-surface-700 truncate">
               {selectedEmpresa.tipo === 'inovamed' ? 'Inovamed' : 'M&J Saúde'}
             </p>
@@ -105,7 +124,10 @@ export default function Sidebar() {
                 </p>
               </>
             )}
-          </div>
+            <p className="text-[9px] text-brand-400 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+              Clique para alterar
+            </p>
+          </button>
         </div>
       )}
 
