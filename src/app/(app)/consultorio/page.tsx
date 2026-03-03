@@ -283,6 +283,110 @@ export default function ConsultorioPage() {
     toast.success('Template removido');
   }
 
+  // Generate PDF of the prontuario
+  async function gerarPDFProntuario(atend: Atendimento) {
+    // Fetch doctor signature
+    let assinaturaBase64 = atend.assinatura_medico || '';
+    if (!assinaturaBase64 && user) {
+      const { data: profData } = await supabase
+        .from('profissionais')
+        .select('assinatura_digital, nome_completo')
+        .eq('id', user.id)
+        .single();
+      if (profData?.assinatura_digital) assinaturaBase64 = profData.assinatura_digital;
+    }
+
+    // Fetch doctor info
+    const { data: profInfo } = await supabase
+      .from('profissionais')
+      .select('nome_completo, cbo, cns')
+      .eq('id', atend.profissional_id)
+      .single();
+
+    const nomeProf = profInfo?.nome_completo || user?.nome_completo || 'Medico';
+    const cboProf = profInfo?.cbo || '';
+    const cnsProf = profInfo?.cns || '';
+    const unidadeNome = (selectedUnidade as any)?.municipio?.nome || '';
+    const cnesUnidade = (selectedUnidade as any)?.cnes || '';
+    const pacNome = atend.paciente?.nome_completo || '';
+    const pacCPF = maskCPF(atend.paciente?.cpf || '');
+    const pacNasc = formatDate(atend.paciente?.data_nascimento || '', 'dd/MM/yyyy');
+    const pacIdade = calcularIdade(atend.paciente?.data_nascimento || '');
+    const pacSexo = atend.paciente?.sexo === 'F' ? 'Feminino' : 'Masculino';
+    const dataAtend = formatDate(atend.data_atendimento, 'dd/MM/yyyy');
+    const horaInicio = atend.hora_inicio_atendimento ? new Date(atend.hora_inicio_atendimento).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
+    const horaFim = atend.hora_fim_atendimento ? new Date(atend.hora_fim_atendimento).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) { toast.error('Bloqueio de popup. Habilite popups para gerar PDF.'); return; }
+
+    printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Prontuario - ${pacNome}</title>
+    <style>
+      @page { size: A4; margin: 20mm; }
+      * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
+      body { padding: 0; color: #1a1a1a; font-size: 11pt; line-height: 1.5; }
+      .header { text-align: center; border-bottom: 3px solid #1e40af; padding-bottom: 12px; margin-bottom: 16px; }
+      .header h1 { font-size: 16pt; color: #1e40af; margin-bottom: 2px; }
+      .header p { font-size: 9pt; color: #555; }
+      .section { margin-bottom: 14px; }
+      .section-title { font-size: 10pt; font-weight: 700; color: #1e40af; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #ddd; padding-bottom: 3px; margin-bottom: 6px; }
+      .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; }
+      .field { font-size: 10pt; }
+      .field b { color: #333; }
+      .content { font-size: 10.5pt; white-space: pre-wrap; background: #f8f9fa; padding: 8px 10px; border-radius: 4px; border: 1px solid #e5e7eb; min-height: 30px; }
+      .signature-area { margin-top: 30px; text-align: center; border-top: 1px solid #ddd; padding-top: 16px; }
+      .signature-area img { max-height: 70px; margin-bottom: 4px; }
+      .signature-area .name { font-size: 11pt; font-weight: 700; }
+      .signature-area .info { font-size: 9pt; color: #555; }
+      .footer { margin-top: 20px; text-align: center; font-size: 8pt; color: #999; border-top: 1px solid #eee; padding-top: 8px; }
+      @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+    </style></head><body>
+    <div class="header">
+      <h1>Inovamed - Sistema de Escleroterapia</h1>
+      <p>${unidadeNome}${cnesUnidade ? ' | CNES: ' + cnesUnidade : ''}</p>
+      <p>Prontuario de Atendimento</p>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Dados do Paciente</div>
+      <div class="grid2">
+        <div class="field"><b>Nome:</b> ${pacNome}</div>
+        <div class="field"><b>CPF:</b> ${pacCPF}</div>
+        <div class="field"><b>Nascimento:</b> ${pacNasc} (${pacIdade} anos)</div>
+        <div class="field"><b>Sexo:</b> ${pacSexo}</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Dados do Atendimento</div>
+      <div class="grid2">
+        <div class="field"><b>Data:</b> ${dataAtend}</div>
+        <div class="field"><b>Horario:</b> ${horaInicio}${horaFim ? ' - ' + horaFim : ''}</div>
+        <div class="field"><b>Procedimento:</b> ${atend.procedimento?.tipo === 'bilateral' ? 'Bilateral' : 'Unilateral'}</div>
+        <div class="field"><b>Profissional:</b> Dr(a). ${nomeProf}</div>
+      </div>
+    </div>
+
+    ${(atend.doppler || prontuario.doppler) ? `<div class="section"><div class="section-title">Doppler Vascular</div><div class="content">${atend.doppler || prontuario.doppler}</div></div>` : ''}
+    ${(atend.anamnese || prontuario.anamnese) ? `<div class="section"><div class="section-title">Anamnese</div><div class="content">${atend.anamnese || prontuario.anamnese}</div></div>` : ''}
+    ${(atend.descricao_procedimento || prontuario.descricao_procedimento) ? `<div class="section"><div class="section-title">Descricao do Procedimento</div><div class="content">${atend.descricao_procedimento || prontuario.descricao_procedimento}</div></div>` : ''}
+    ${(atend.observacoes || prontuario.observacoes) ? `<div class="section"><div class="section-title">Observacoes</div><div class="content">${atend.observacoes || prontuario.observacoes}</div></div>` : ''}
+
+    <div class="signature-area">
+      ${assinaturaBase64 ? `<img src="${assinaturaBase64}" alt="Assinatura">` : '<div style="height:50px;border-bottom:1px solid #333;width:250px;margin:0 auto;"></div>'}
+      <div class="name">Dr(a). ${nomeProf}</div>
+      <div class="info">${cboProf ? 'CBO: ' + cboProf : ''}${cnsProf ? ' | CNS: ' + cnsProf : ''}</div>
+      <div class="info">Data: ${dataAtend} ${horaFim ? '| Finalizado as ' + horaFim : ''}</div>
+    </div>
+
+    <div class="footer">
+      Documento gerado pelo sistema Inovamed em ${new Date().toLocaleString('pt-BR')} | Este documento e parte do prontuario eletronico do paciente.
+    </div>
+    </body></html>`);
+    printWindow.document.close();
+    setTimeout(() => printWindow.print(), 500);
+  }
+
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto pt-16 lg:pt-0">
       <PageHeader
@@ -417,12 +521,20 @@ export default function ConsultorioPage() {
                                 {atend.reabertura_count ? ` • Reaberto ${atend.reabertura_count}x` : ''}
                               </p>
                             </div>
-                            <button
-                              onClick={() => reabrirAtendimento(atend)}
-                              className="text-[11px] font-semibold text-amber-700 bg-amber-50 px-2.5 py-1.5 rounded-md hover:bg-amber-100 transition-colors flex-shrink-0"
-                            >
-                              Reabrir
-                            </button>
+                            <div className="flex gap-1.5 flex-shrink-0">
+                              <button
+                                onClick={() => gerarPDFProntuario(atend)}
+                                className="text-[11px] font-semibold text-purple-700 bg-purple-50 px-2.5 py-1.5 rounded-md hover:bg-purple-100 transition-colors"
+                              >
+                                PDF
+                              </button>
+                              <button
+                                onClick={() => reabrirAtendimento(atend)}
+                                className="text-[11px] font-semibold text-amber-700 bg-amber-50 px-2.5 py-1.5 rounded-md hover:bg-amber-100 transition-colors"
+                              >
+                                Reabrir
+                              </button>
+                            </div>
                           </div>
                         </div>
                       );
@@ -662,9 +774,17 @@ export default function ConsultorioPage() {
                   ))}
                 </div>
                 <div className="px-5 py-4 border-t border-surface-100 flex justify-between gap-2">
-                  <button onClick={() => salvarProntuario(false)} disabled={saving} className="btn-secondary text-sm">
-                    Salvar Rascunho
-                  </button>
+                  <div className="flex gap-2">
+                    <button onClick={() => salvarProntuario(false)} disabled={saving} className="btn-secondary text-sm">
+                      Salvar Rascunho
+                    </button>
+                    <button
+                      onClick={() => gerarPDFProntuario(atendimentoAtual)}
+                      className="text-sm font-medium text-purple-700 bg-purple-50 border border-purple-200 px-3 py-2 rounded-lg hover:bg-purple-100 transition-colors"
+                    >
+                      Gerar PDF
+                    </button>
+                  </div>
                   <button onClick={() => salvarProntuario(true)} disabled={saving} className="btn-success text-sm">
                     {saving ? 'Salvando...' : 'Finalizar Atendimento'}
                   </button>
