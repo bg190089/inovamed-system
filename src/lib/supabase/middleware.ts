@@ -10,6 +10,8 @@ const ROUTE_ROLES: Record<string, string[]> = {
   '/consultorio': ['admin', 'gestor', 'medico'],
   '/agendamento': ['admin', 'gestor', 'recepcionista', 'medico'],
   '/assinatura-medico': ['admin', 'medico'],
+  '/pacientes': ['admin', 'gestor', 'medico'],
+  '/triagem': ['admin', 'gestor', 'recepcionista'],
 };
 
 export async function updateSession(request: NextRequest) {
@@ -36,7 +38,7 @@ export async function updateSession(request: NextRequest) {
   );
 
   const { data: { user } } = await supabase.auth.getUser();
-  const publicPaths = ['/login', '/assinatura', '/api/setup'];
+  const publicPaths = ['/login', '/assinatura', '/api/setup', '/upload-qr'];
   const isPublic = publicPaths.some(p => request.nextUrl.pathname.startsWith(p));
 
   if (!user && !isPublic) {

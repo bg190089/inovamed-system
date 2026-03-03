@@ -30,7 +30,7 @@ interface TriagemForm {
   doppler_venoso_detalhe: string;
   gravidez_amamentacao: boolean;
   observacao: string;
-  data_primeira_sessao: string;
+  data_proxima_sessao: string;
 }
 
 const EMPTY_FORM: TriagemForm = {
@@ -41,7 +41,7 @@ const EMPTY_FORM: TriagemForm = {
   trombose_embolia: false, trombose_embolia_detalhe: '',
   doencas_vasculares: false, doencas_vasculares_detalhe: '',
   doppler_venoso: false, doppler_venoso_detalhe: '',
-  gravidez_amamentacao: false, observacao: '', data_primeira_sessao: '',
+  gravidez_amamentacao: false, observacao: '', data_proxima_sessao: '',
 };
 
 export default function TriagemPage() {
@@ -131,7 +131,7 @@ export default function TriagemPage() {
             doppler_venoso_detalhe: last.doppler_venoso_detalhe || '',
             gravidez_amamentacao: last.gravidez_amamentacao,
             observacao: last.observacao || '',
-            data_primeira_sessao: '', // blank
+            data_proxima_sessao: '', // blank
           });
         } else {
           setForm(EMPTY_FORM);
@@ -152,7 +152,7 @@ export default function TriagemPage() {
         profissional_id: user.id,
         empresa_id: selectedEmpresa?.id,
         ...form,
-        data_primeira_sessao: form.data_primeira_sessao || null,
+        data_proxima_sessao: form.data_proxima_sessao || null,
       });
 
       // Update atendimento: link triagem and move to doctor's queue
@@ -167,21 +167,24 @@ export default function TriagemPage() {
         toast.success('Triagem salva');
       }
 
-      // Create agendamento if data_primeira_sessao is set
-      if (form.data_primeira_sessao && selectedAtend.profissional_id) {
+      // Create agendamento if data_proxima_sessao is set
+      if (form.data_proxima_sessao) {
         try {
-          await agendamentoService.createAgendamento({
+          await supabase.from('agendamentos').insert({
             empresa_id: selectedEmpresa?.id,
             unidade_id: selectedUnidade.id,
             paciente_id: selectedAtend.paciente_id,
             profissional_id: selectedAtend.profissional_id,
             procedimento_id: selectedAtend.procedimento_id,
-            data_agendamento: form.data_primeira_sessao,
+            data_agendamento: form.data_proxima_sessao,
             hora_inicio: '08:00',
+            numero_sessao: 1,
             status: 'agendado',
           });
-        } catch (e) {
+          toast.success(`Agendamento criado para ${formatDate(form.data_proxima_sessao)}`);
+        } catch (e: any) {
           console.error('Erro ao criar agendamento:', e);
+          toast.error('Erro ao criar agendamento: ' + (e?.message || ''));
         }
       }
 
@@ -520,9 +523,9 @@ export default function TriagemPage() {
                       Agendamento
                     </h3>
                     <div>
-                      <label className="block text-xs font-medium text-surface-600 mb-1">Data da Primeira Sessao</label>
-                      <input type="date" value={form.data_primeira_sessao}
-                        onChange={e => setForm(f => ({ ...f, data_primeira_sessao: e.target.value }))}
+                      <label className="block text-xs font-medium text-surface-600 mb-1">Data da Proxima Sessao</label>
+                      <input type="date" value={form.data_proxima_sessao}
+                        onChange={e => setForm(f => ({ ...f, data_proxima_sessao: e.target.value }))}
                         className="w-full sm:w-64 px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400" />
                       <p className="text-xs text-surface-400 mt-1">Sera criado automaticamente no modulo de Agendamento</p>
                     </div>

@@ -25,7 +25,7 @@ export interface Triagem {
   doppler_venoso_detalhe?: string;
   gravidez_amamentacao: boolean;
   observacao?: string;
-  data_primeira_sessao?: string;
+  data_proxima_sessao?: string;
   agendamento_id?: string;
   created_at: string;
   updated_at: string;

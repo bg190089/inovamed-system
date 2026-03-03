@@ -63,6 +63,14 @@ export default function RecepcaoPage() {
   const [isNewPatient, setIsNewPatient] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0); // For wait time updates
 
+  const [editingAtendimento, setEditingAtendimento] = useState<Atendimento | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState({
+    nome_completo: '', sexo: 'F' as 'M' | 'F', data_nascimento: '',
+    cpf: '', cns: '', cep: '', logradouro: '', numero: '', complemento: '',
+    bairro: '', cidade: '', uf: 'BA', telefone: '',
+  });
+
   const [form, setForm] = useState({
     nome_completo: '', sexo: 'F' as 'M' | 'F', data_nascimento: '',
     cpf: '', cns: '', cep: '', logradouro: '', numero: '', complemento: '',
@@ -215,6 +223,65 @@ export default function RecepcaoPage() {
     setForm({ nome_completo: '', sexo: 'F', data_nascimento: '', cpf: '', cns: '', cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', uf: 'BA', telefone: '' });
   }
 
+  function canEditPatient(status: string) {
+    return status === 'aguardando_triagem' || status === 'aguardando';
+  }
+
+  function openEditModal(atend: Atendimento) {
+    if (!canEditPatient(atend.status)) {
+      toast.error('Paciente ja esta em atendimento. Nao e possivel editar.');
+      return;
+    }
+    setEditingAtendimento(atend);
+    const pac = atend.paciente;
+    if (pac) {
+      setEditForm({
+        nome_completo: pac.nome_completo || '',
+        sexo: pac.sexo || 'F',
+        data_nascimento: pac.data_nascimento || '',
+        cpf: maskCPF(pac.cpf || ''),
+        cns: maskCNS(pac.cns || ''),
+        cep: maskCEP(pac.cep || ''),
+        logradouro: pac.logradouro || '',
+        numero: pac.numero || '',
+        complemento: pac.complemento || '',
+        bairro: pac.bairro || '',
+        cidade: pac.cidade || '',
+        uf: pac.uf || 'BA',
+        telefone: maskPhone(pac.telefone || ''),
+      });
+    }
+    setShowEditModal(true);
+  }
+
+  async function handleSaveEdit() {
+    if (!editingAtendimento?.paciente?.id) return;
+    setLoading(true);
+    try {
+      await pacienteService.atualizar(editingAtendimento.paciente.id, {
+        nome_completo: editForm.nome_completo,
+        sexo: editForm.sexo,
+        data_nascimento: editForm.data_nascimento,
+        cpf: unmask(editForm.cpf),
+        cns: unmask(editForm.cns) || null,
+        cep: unmask(editForm.cep) || null,
+        logradouro: editForm.logradouro || null,
+        numero: editForm.numero || null,
+        complemento: editForm.complemento || null,
+        bairro: editForm.bairro || null,
+        cidade: editForm.cidade || null,
+        uf: editForm.uf,
+        telefone: unmask(editForm.telefone) || null,
+      } as any);
+      toast.success('Dados do paciente atualizados');
+      setShowEditModal(false);
+      setEditingAtendimento(null);
+      loadFila();
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao atualizar');
+    } finally { setLoading(false); }
+  }
+
   const aguardandoTriagem = fila.filter(f => f.status === 'aguardando_triagem');
   const aguardando = fila.filter(f => f.status === 'aguardando');
   const emAtendimento = fila.filter(f => f.status === 'em_atendimento');
@@ -310,11 +377,18 @@ export default function RecepcaoPage() {
                       </td>
                       <td className="px-4 py-3 text-center"><span className={`badge ${getStatusColor(atend.status)}`}>{getStatusLabel(atend.status)}</span></td>
                       <td className="px-4 py-3 text-center">
-                        {atend.status === 'aguardando' && (
-                          <button onClick={() => cancelarAtendimento(atend)} className="text-red-500 hover:text-red-700 transition-colors" title="Cancelar">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                          </button>
-                        )}
+                        <div className="flex items-center justify-center gap-1">
+                          {canEditPatient(atend.status) && (
+                            <button onClick={() => openEditModal(atend)} className="text-brand-500 hover:text-brand-700 transition-colors" title="Editar dados">
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                            </button>
+                          )}
+                          {(atend.status === 'aguardando' || atend.status === 'aguardando_triagem') && (
+                            <button onClick={() => cancelarAtendimento(atend)} className="text-red-500 hover:text-red-700 transition-colors" title="Cancelar">
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -382,7 +456,12 @@ export default function RecepcaoPage() {
                       </div>
 
                       <div className="flex gap-2 pt-2 border-t border-surface-100">
-                        {atend.status === 'aguardando' && (
+                        {canEditPatient(atend.status) && (
+                          <button onClick={() => openEditModal(atend)} className="flex-1 text-sm px-3 py-2 text-brand-600 hover:bg-brand-50 rounded-lg transition-colors font-medium">
+                            Editar
+                          </button>
+                        )}
+                        {(atend.status === 'aguardando' || atend.status === 'aguardando_triagem') && (
                           <button onClick={() => cancelarAtendimento(atend)} className="flex-1 text-sm px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors font-medium">
                             Cancelar
                           </button>
@@ -477,6 +556,87 @@ export default function RecepcaoPage() {
       <ConfirmDialog open={confirmState.open} title={confirmState.title} description={confirmState.description}
         variant={confirmState.variant} confirmLabel={confirmState.confirmLabel}
         onConfirm={confirmState.onConfirm} onCancel={closeConfirm} />
+
+      {/* Edit Patient Modal */}
+      {showEditModal && editingAtendimento && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-start justify-center p-4 pt-4 overflow-y-auto md:pt-12">
+          <div className="bg-white rounded-2xl shadow-elevated max-w-2xl w-full mb-8 min-h-screen md:min-h-auto md:rounded-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-surface-100 sticky top-0 bg-white rounded-t-2xl z-10">
+              <h2 className="text-lg font-display font-bold text-surface-900">Editar Dados do Paciente</h2>
+              <button onClick={() => { setShowEditModal(false); setEditingAtendimento(null); }} className="p-2 rounded-lg hover:bg-surface-100">
+                <svg className="w-5 h-5 text-surface-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-700">
+                Editando dados de <strong>{editingAtendimento.paciente?.nome_completo}</strong>. As alteracoes serao salvas no cadastro do paciente.
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="md:col-span-2">
+                  <label className="input-label">Nome Completo</label>
+                  <input type="text" value={editForm.nome_completo} onChange={(e) => setEditForm({ ...editForm, nome_completo: e.target.value.toUpperCase() })} className="input-field" />
+                </div>
+                <div>
+                  <label className="input-label">CPF</label>
+                  <input type="text" value={editForm.cpf} onChange={(e) => setEditForm({ ...editForm, cpf: maskCPF(e.target.value) })} className="input-field" maxLength={14} />
+                </div>
+                <div>
+                  <label className="input-label">Data Nascimento</label>
+                  <input type="date" value={editForm.data_nascimento} onChange={(e) => setEditForm({ ...editForm, data_nascimento: e.target.value })} className="input-field" />
+                </div>
+                <div>
+                  <label className="input-label">Sexo</label>
+                  <select value={editForm.sexo} onChange={(e) => setEditForm({ ...editForm, sexo: e.target.value as any })} className="input-field">
+                    <option value="F">Feminino</option><option value="M">Masculino</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="input-label">Cartao SUS (CNS)</label>
+                  <input type="text" value={editForm.cns} onChange={(e) => setEditForm({ ...editForm, cns: maskCNS(e.target.value) })} className="input-field" maxLength={18} />
+                </div>
+                <div>
+                  <label className="input-label">Telefone</label>
+                  <input type="text" value={editForm.telefone} onChange={(e) => setEditForm({ ...editForm, telefone: maskPhone(e.target.value) })} className="input-field" maxLength={15} />
+                </div>
+                <div>
+                  <label className="input-label">CEP</label>
+                  <input type="text" value={editForm.cep} onChange={(e) => setEditForm({ ...editForm, cep: maskCEP(e.target.value) })} className="input-field" maxLength={9} />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="input-label">Logradouro</label>
+                  <input type="text" value={editForm.logradouro} onChange={(e) => setEditForm({ ...editForm, logradouro: e.target.value })} className="input-field" />
+                </div>
+                <div>
+                  <label className="input-label">Numero</label>
+                  <input type="text" value={editForm.numero} onChange={(e) => setEditForm({ ...editForm, numero: e.target.value })} className="input-field" />
+                </div>
+                <div>
+                  <label className="input-label">Complemento</label>
+                  <input type="text" value={editForm.complemento} onChange={(e) => setEditForm({ ...editForm, complemento: e.target.value })} className="input-field" />
+                </div>
+                <div>
+                  <label className="input-label">Bairro</label>
+                  <input type="text" value={editForm.bairro} onChange={(e) => setEditForm({ ...editForm, bairro: e.target.value })} className="input-field" />
+                </div>
+                <div>
+                  <label className="input-label">Cidade</label>
+                  <input type="text" value={editForm.cidade} onChange={(e) => setEditForm({ ...editForm, cidade: e.target.value })} className="input-field" />
+                </div>
+                <div>
+                  <label className="input-label">UF</label>
+                  <input type="text" value={editForm.uf} onChange={(e) => setEditForm({ ...editForm, uf: e.target.value.toUpperCase() })} className="input-field" maxLength={2} />
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-surface-100 flex flex-col-reverse md:flex-row justify-end gap-3 sticky bottom-0 bg-white rounded-b-2xl">
+              <button onClick={() => { setShowEditModal(false); setEditingAtendimento(null); }} className="btn-secondary">Cancelar</button>
+              <button onClick={handleSaveEdit} disabled={loading} className="btn-success">
+                {loading ? 'Salvando...' : 'Salvar Alteracoes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* New Atendimento Modal */}
       {showModal && (
