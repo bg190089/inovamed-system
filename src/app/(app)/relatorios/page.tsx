@@ -72,7 +72,59 @@ export default function RelatoriosPage() {
     const a = document.createElement('a');
     a.href = url; a.download = filename; a.click();
     URL.revokeObjectURL(url);
-    toast.success('Arquivo exportado');
+    toast.success('Arquivo CSV exportado');
+  }
+
+  function exportToPDF(data: any[], title: string, filename: string) {
+    if (!data.length) { toast.error('Nada para exportar'); return; }
+    const uni = unidades.find(u => u.id === selectedUnidadeReport);
+    const uniName = (uni as any)?.municipio?.nome || uni?.nome || '';
+    const headers = Object.keys(data[0]);
+    const headerLabels: Record<string, string> = {
+      cnes: 'CNES', competencia: 'Comp.', cns_profissional: 'CNS Prof.', cbo: 'CBO',
+      data_atendimento: 'Data', numero_folha: 'Folha', numero_sequencial: 'Seq.',
+      procedimento: 'Proc.', paciente_nome: 'Paciente', paciente_cpf: 'CPF',
+      paciente_cns: 'CNS Pac.', paciente_sexo: 'Sexo', paciente_municipio: 'Municipio',
+      paciente_nascimento: 'Nasc.', cid: 'CID', carater: 'Carater', quantidade: 'Qtd',
+      profissional_nome: 'Profissional', profissional_crm: 'CRM',
+      total_atendimentos: 'Total', total_unilateral: 'Unilateral', total_bilateral: 'Bilateral',
+      media_diaria: 'Media/Dia', municipio_nome: 'Municipio', total_profissionais: 'Profissionais',
+      dias_atendimento: 'Dias',
+    };
+
+    const tableRows = data.map(row =>
+      `<tr>${headers.map(h => `<td style="border:1px solid #ddd;padding:4px 6px;font-size:10px;white-space:nowrap">${row[h] ?? ''}</td>`).join('')}</tr>`
+    ).join('');
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title>
+      <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        h1 { font-size: 16px; color: #1a365d; margin-bottom: 4px; }
+        h2 { font-size: 12px; color: #666; font-weight: normal; margin-bottom: 16px; }
+        table { border-collapse: collapse; width: 100%; }
+        th { background: #1a365d; color: white; padding: 6px 8px; font-size: 10px; text-align: left; border: 1px solid #1a365d; }
+        tr:nth-child(even) { background: #f8f9fa; }
+        .footer { margin-top: 20px; font-size: 10px; color: #999; border-top: 1px solid #ddd; padding-top: 8px; }
+        @media print { body { margin: 10px; } }
+      </style></head><body>
+      <h1>Inovamed - ${title}</h1>
+      <h2>${uniName ? uniName + ' | ' : ''}Competencia: ${formatCompetencia(competencia)} | Gerado em: ${new Date().toLocaleDateString('pt-BR')}</h2>
+      <table>
+        <thead><tr>${headers.map(h => `<th>${headerLabels[h] || h}</th>`).join('')}</tr></thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+      <div class="footer">Total: ${data.length} registros | Sistema Inovamed &copy; ${new Date().getFullYear()}</div>
+      <script>window.onload=function(){window.print();}</script>
+    </body></html>`;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(html);
+      printWindow.document.close();
+      toast.success('PDF gerado - use Ctrl+P para salvar');
+    } else {
+      toast.error('Popup bloqueado. Habilite popups para gerar o PDF.');
+    }
   }
 
   const tabs: { key: TabType; label: string }[] = [
@@ -107,10 +159,16 @@ export default function RelatoriosPage() {
               </div>
               <button onClick={loadBPA} disabled={loading} className="btn-primary text-sm">{loading ? 'Gerando...' : 'Gerar BPA'}</button>
               {bpaData.length > 0 && (
-                <button onClick={() => {
-                  const uni = unidades.find(u => u.id === selectedUnidadeReport);
-                  exportToCSV(bpaData, `BPA_${(uni as any)?.municipio?.nome || 'Municipio'}_${competencia}.csv`);
-                }} className="btn-secondary text-sm">Exportar CSV</button>
+                <>
+                  <button onClick={() => {
+                    const uni = unidades.find(u => u.id === selectedUnidadeReport);
+                    exportToCSV(bpaData, `BPA_${(uni as any)?.municipio?.nome || 'Municipio'}_${competencia}.csv`);
+                  }} className="btn-secondary text-sm">Exportar CSV</button>
+                  <button onClick={() => exportToPDF(bpaData, 'BPA Individualizado', `BPA_${competencia}.pdf`)} className="btn-primary text-sm">
+                    <svg className="w-4 h-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                    Gerar PDF
+                  </button>
+                </>
               )}
             </div>
           </div>
@@ -160,7 +218,12 @@ export default function RelatoriosPage() {
               <div><label className="input-label">Data Inicio</label><input type="date" value={dateRange.start} onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })} className="input-field" /></div>
               <div><label className="input-label">Data Fim</label><input type="date" value={dateRange.end} onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })} className="input-field" /></div>
               <button onClick={loadProdMedico} disabled={loading} className="btn-primary text-sm">{loading ? 'Carregando...' : 'Gerar Relatorio'}</button>
-              {prodMedico.length > 0 && <button onClick={() => exportToCSV(prodMedico, `Produtividade_Medica_${dateRange.start}_${dateRange.end}.csv`)} className="btn-secondary text-sm">Exportar CSV</button>}
+              {prodMedico.length > 0 && (
+                <>
+                  <button onClick={() => exportToCSV(prodMedico, `Produtividade_Medica_${dateRange.start}_${dateRange.end}.csv`)} className="btn-secondary text-sm">Exportar CSV</button>
+                  <button onClick={() => exportToPDF(prodMedico, 'Produtividade Medica', `ProdMedica_${dateRange.start}.pdf`)} className="btn-primary text-sm">Gerar PDF</button>
+                </>
+              )}
             </div>
           </div>
           {prodMedico.length > 0 && (
@@ -204,7 +267,12 @@ export default function RelatoriosPage() {
             <div className="flex gap-3 items-end">
               <div><label className="input-label">Competencia</label><input type="month" value={`${competencia.slice(0,4)}-${competencia.slice(4)}`} onChange={(e) => setCompetencia(e.target.value.replace('-', ''))} className="input-field" /></div>
               <button onClick={loadProdMunicipio} disabled={loading} className="btn-primary text-sm">{loading ? 'Carregando...' : 'Gerar Relatorio'}</button>
-              {prodMunicipio.length > 0 && <button onClick={() => exportToCSV(prodMunicipio, `Produtividade_Municipio_${competencia}.csv`)} className="btn-secondary text-sm">Exportar CSV</button>}
+              {prodMunicipio.length > 0 && (
+                <>
+                  <button onClick={() => exportToCSV(prodMunicipio, `Produtividade_Municipio_${competencia}.csv`)} className="btn-secondary text-sm">Exportar CSV</button>
+                  <button onClick={() => exportToPDF(prodMunicipio, 'Produtividade por Municipio', `ProdMunicipio_${competencia}.pdf`)} className="btn-primary text-sm">Gerar PDF</button>
+                </>
+              )}
             </div>
           </div>
           {prodMunicipio.length > 0 && (

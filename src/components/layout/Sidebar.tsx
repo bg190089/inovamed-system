@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
@@ -70,20 +70,29 @@ const navigation = [
   },
 ];
 
-export default function Sidebar() {
-  const [collapsed, setCollapsed] = useState(false);
+function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: () => void }) {
   const pathname = usePathname();
   const { user, selectedEmpresa, selectedUnidade, signOut, hasRole } = useAuth();
 
-  const filteredNav = navigation.filter(item => 
+  const filteredNav = navigation.filter(item =>
     item.roles.some(role => hasRole(role as any))
   );
 
+  const handleNavClick = () => {
+    if (onNavigate) {
+      onNavigate();
+    }
+  };
+
+  const handleSignOut = () => {
+    signOut();
+    if (onNavigate) {
+      onNavigate();
+    }
+  };
+
   return (
-    <aside className={cn(
-      'h-screen bg-white border-r border-surface-100 flex flex-col transition-all duration-300',
-      collapsed ? 'w-[72px]' : 'w-64'
-    )}>
+    <>
       {/* Logo */}
       <div className="h-16 flex items-center gap-3 px-4 border-b border-surface-100">
         <div className="w-9 h-9 bg-brand-600 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -139,6 +148,7 @@ export default function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={handleNavClick}
               className={cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 group',
                 isActive
@@ -178,8 +188,10 @@ export default function Sidebar() {
         )}
         <div className="flex gap-1">
           <button
-            onClick={() => setCollapsed(!collapsed)}
-            className="flex-1 p-2 rounded-lg text-surface-400 hover:bg-surface-50 hover:text-surface-600 transition-colors"
+            onClick={() => {
+              // Collapse toggle - only visible on desktop
+            }}
+            className="hidden lg:flex flex-1 p-2 rounded-lg text-surface-400 hover:bg-surface-50 hover:text-surface-600 transition-colors"
             title={collapsed ? 'Expandir' : 'Recolher'}
           >
             <svg className={cn('w-4 h-4 mx-auto transition-transform', collapsed && 'rotate-180')} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -187,7 +199,7 @@ export default function Sidebar() {
             </svg>
           </button>
           <button
-            onClick={signOut}
+            onClick={handleSignOut}
             className="flex-1 p-2 rounded-lg text-surface-400 hover:bg-red-50 hover:text-red-600 transition-colors"
             title="Sair"
           >
@@ -197,6 +209,94 @@ export default function Sidebar() {
           </button>
         </div>
       </div>
-    </aside>
+    </>
+  );
+}
+
+export default function Sidebar() {
+  const [collapsed, setCollapsed] = useState(false);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+
+  useEffect(() => {
+    const handleToggleMobileSidebar = () => {
+      setMobileDrawerOpen(prev => !prev);
+    };
+
+    window.addEventListener('toggleMobileSidebar', handleToggleMobileSidebar);
+    return () => {
+      window.removeEventListener('toggleMobileSidebar', handleToggleMobileSidebar);
+    };
+  }, []);
+
+  const closeMobileDrawer = () => {
+    setMobileDrawerOpen(false);
+  };
+
+  return (
+    <>
+      {/* Desktop Sidebar */}
+      <aside className={cn(
+        'hidden lg:flex h-screen bg-white border-r border-surface-100 flex-col transition-all duration-300',
+        collapsed ? 'w-[72px]' : 'w-64'
+      )}>
+        <SidebarContent collapsed={collapsed} />
+
+        {/* Collapse toggle button - desktop only */}
+        <div className="border-t border-surface-100 p-3">
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            className="w-full p-2 rounded-lg text-surface-400 hover:bg-surface-50 hover:text-surface-600 transition-colors"
+            title={collapsed ? 'Expandir' : 'Recolher'}
+          >
+            <svg className={cn('w-4 h-4 mx-auto transition-transform', collapsed && 'rotate-180')} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+            </svg>
+          </button>
+        </div>
+      </aside>
+
+      {/* Mobile Hamburger Button */}
+      <button
+        onClick={() => setMobileDrawerOpen(true)}
+        className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-white border border-surface-200 text-surface-600 hover:bg-surface-50 transition-colors shadow-md"
+        title="Abrir menu"
+      >
+        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+
+      {/* Mobile Drawer Overlay */}
+      {mobileDrawerOpen && (
+        <div
+          onClick={closeMobileDrawer}
+          className="fixed inset-0 z-30 bg-black/40 lg:hidden"
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Mobile Drawer */}
+      <div
+        className={cn(
+          'fixed inset-y-0 left-0 z-40 w-72 bg-white transform transition-transform duration-300 lg:hidden flex flex-col',
+          mobileDrawerOpen ? 'translate-x-0' : '-translate-x-full'
+        )}
+      >
+        {/* Close button for mobile drawer */}
+        <div className="absolute top-4 right-4 z-50">
+          <button
+            onClick={closeMobileDrawer}
+            className="p-2 rounded-lg text-surface-400 hover:bg-surface-50 hover:text-surface-600 transition-colors"
+            title="Fechar menu"
+          >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <SidebarContent collapsed={false} onNavigate={closeMobileDrawer} />
+      </div>
+    </>
   );
 }

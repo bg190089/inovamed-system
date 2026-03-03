@@ -6,6 +6,7 @@ export type UserRole = 'admin' | 'gestor' | 'medico' | 'recepcionista';
 export type SexoType = 'M' | 'F';
 export type ProcedimentoTipo = 'unilateral' | 'bilateral';
 export type AtendimentoStatus = 'aguardando' | 'em_atendimento' | 'finalizado' | 'cancelado';
+export type AgendamentoStatus = 'agendado' | 'confirmado' | 'cancelado' | 'realizado' | 'faltou';
 export type EmpresaTipo = 'inovamed' | 'mj';
 
 export interface Empresa {
@@ -35,8 +36,10 @@ export interface Unidade {
 export interface Profissional {
   id: string;
   user_id?: string;
+  email?: string;
   nome_completo: string;
   cns?: string;
+  cns_profissional?: string;
   cpf?: string;
   cbo: string;
   crm?: string;
@@ -117,6 +120,28 @@ export interface FilaAtendimento {
   data_fila: string;
   chamado: boolean;
   atendimento?: Atendimento;
+}
+
+export interface Agendamento {
+  id: string;
+  empresa_id: string;
+  unidade_id: string;
+  paciente_id: string;
+  profissional_id: string;
+  procedimento_id: string;
+  data_agendamento: string;
+  hora_inicio: string;
+  hora_fim?: string;
+  observacoes?: string;
+  status: AgendamentoStatus;
+  created_at: string;
+  updated_at?: string;
+  // Relations
+  paciente?: Paciente;
+  profissional?: Profissional;
+  procedimento?: Procedimento;
+  unidade?: Unidade;
+  empresa?: Empresa;
 }
 
 export interface SessionContext {

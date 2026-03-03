@@ -11,6 +11,38 @@ import { maskCPF, maskCNS, maskPhone, maskCEP, unmask, formatDate, calcularIdade
 import { ConfirmDialog, EmptyState, PageHeader } from '@/components/ui';
 import type { Paciente, Atendimento, Procedimento, Profissional } from '@/types';
 
+// Helper: Calculate wait time in human readable format
+function calcWaitTime(hora_chegada: string | null): string {
+  if (!hora_chegada) return '—';
+  const diff = Math.floor((Date.now() - new Date(hora_chegada).getTime()) / 60000);
+  if (diff < 1) return '<1 min';
+  if (diff >= 60) {
+    const hours = Math.floor(diff / 60);
+    const mins = diff % 60;
+    return mins > 0 ? `${hours}h${String(mins).padStart(2, '0')}min` : `${hours}h`;
+  }
+  return `${diff} min`;
+}
+
+// Helper: Get wait time color based on elapsed time
+function getWaitTimeColor(hora_chegada: string | null): string {
+  if (!hora_chegada) return 'text-surface-500';
+  const diff = Math.floor((Date.now() - new Date(hora_chegada).getTime()) / 60000);
+  if (diff < 15) return 'text-emerald-600 font-semibold';
+  if (diff < 30) return 'text-yellow-600 font-semibold';
+  if (diff < 60) return 'text-orange-600 font-semibold';
+  return 'text-red-600 font-semibold';
+}
+
+// Helper: Get priority badge based on age
+function getPriorityBadge(dataNascimento: string): { label: string; className: string; emoji: string } | null {
+  const age = calcularIdade(dataNascimento);
+  if (age >= 60) return { label: 'PRIORITÁRIO', className: 'bg-red-100 text-red-700', emoji: '🔴' };
+  if (age < 12) return { label: 'CRIANÇA', className: 'bg-orange-100 text-orange-700', emoji: '🟠' };
+  if (age < 18) return { label: 'ADOLESCENTE', className: 'bg-yellow-100 text-yellow-700', emoji: '🟡' };
+  return null;
+}
+
 export default function RecepcaoPage() {
   const { selectedEmpresa, selectedUnidade } = useAuth();
   const supabase = useSupabase();
@@ -29,6 +61,7 @@ export default function RecepcaoPage() {
   const [selectedProc, setSelectedProc] = useState('');
   const [selectedProf, setSelectedProf] = useState('');
   const [isNewPatient, setIsNewPatient] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0); // For wait time updates
 
   const [form, setForm] = useState({
     nome_completo: '', sexo: 'F' as 'M' | 'F', data_nascimento: '',
@@ -43,6 +76,14 @@ export default function RecepcaoPage() {
       setFila(data);
     } catch (err) { console.error(err); }
   }, [selectedUnidade, atendimentoService]);
+
+  // Auto-refresh wait times every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setRefreshKey(k => k + 1);
+    }, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (selectedUnidade) {
@@ -178,8 +219,11 @@ export default function RecepcaoPage() {
   const emAtendimento = fila.filter(f => f.status === 'em_atendimento');
   const finalizados = fila.filter(f => f.status === 'finalizado');
 
+  // Use refreshKey to trigger re-renders for wait time updates
+  const _ = refreshKey;
+
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+    <div className="p-4 lg:p-8 max-w-7xl mx-auto pt-16 lg:pt-0">
       <PageHeader
         title="Recepcao"
         subtitle={`${(selectedUnidade as any)?.municipio?.nome || '—'} • ${formatDate(new Date(), 'dd/MM/yyyy')} • ${fila.length} pacientes hoje`}
@@ -192,26 +236,26 @@ export default function RecepcaoPage() {
       />
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         {[
           { label: 'Aguardando', sublabel: 'Na fila', count: aguardando.length, bg: 'bg-amber-100', text: 'text-amber-600' },
           { label: 'Em atendimento', sublabel: 'No consultorio', count: emAtendimento.length, bg: 'bg-blue-100', text: 'text-blue-600' },
           { label: 'Finalizados', sublabel: 'Hoje', count: finalizados.length, bg: 'bg-emerald-100', text: 'text-emerald-600' },
         ].map((s, i) => (
           <div key={i} className="stat-card flex items-center gap-4">
-            <div className={`w-10 h-10 rounded-full ${s.bg} flex items-center justify-center`}>
+            <div className={`w-10 h-10 rounded-full ${s.bg} flex items-center justify-center flex-shrink-0`}>
               <span className={`${s.text} font-bold`}>{s.count}</span>
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-xs text-surface-500">{s.label}</p>
-              <p className="font-semibold text-surface-800">{s.sublabel}</p>
+              <p className="font-semibold text-surface-800 truncate">{s.sublabel}</p>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Queue Table */}
-      <div className="card">
+      {/* Queue Table - Desktop & Tablet */}
+      <div className="card hidden md:block">
         <div className="px-6 py-4 border-b border-surface-100 flex items-center justify-between">
           <h2 className="font-display font-semibold text-surface-800">Fila do Dia</h2>
           <button onClick={loadFila} className="text-xs text-brand-600 hover:text-brand-700 font-medium">Atualizar</button>
@@ -222,42 +266,208 @@ export default function RecepcaoPage() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead><tr className="table-header">
-                <th className="px-4 py-3 text-left w-12">#</th>
+                <th className="px-4 py-3 text-left w-8">#</th>
                 <th className="px-4 py-3 text-left">Paciente</th>
+                <th className="px-4 py-3 text-left">Idade / Prior.</th>
                 <th className="px-4 py-3 text-left">Procedimento</th>
-                <th className="px-4 py-3 text-left">Medico</th>
+                <th className="px-4 py-3 text-left">Médico</th>
                 <th className="px-4 py-3 text-left">Chegada</th>
+                <th className="px-4 py-3 text-left">Espera</th>
                 <th className="px-4 py-3 text-center">Status</th>
-                <th className="px-4 py-3 text-center w-20">Acoes</th>
+                <th className="px-4 py-3 text-center w-16">Ações</th>
               </tr></thead>
               <tbody>
-                {fila.map((atend, i) => (
-                  <tr key={atend.id} className="table-row">
-                    <td className="px-4 py-3 text-sm font-mono text-surface-400">{i + 1}</td>
-                    <td className="px-4 py-3">
-                      <p className="text-sm font-medium text-surface-800">{atend.paciente?.nome_completo}</p>
-                      <p className="text-xs text-surface-400">{maskCPF(atend.paciente?.cpf || '')} • {calcularIdade(atend.paciente?.data_nascimento || '')}a</p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={cn('badge text-xs', atend.procedimento?.tipo === 'bilateral' ? 'bg-purple-100 text-purple-700' : 'bg-sky-100 text-sky-700')}>
-                        {atend.procedimento?.tipo === 'bilateral' ? 'Bilateral' : 'Unilateral'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-surface-600">Dr(a). {atend.profissional?.nome_completo?.split(' ')[0]}</td>
-                    <td className="px-4 py-3 text-sm text-surface-500">{atend.hora_chegada ? formatDate(atend.hora_chegada, 'HH:mm') : '—'}</td>
-                    <td className="px-4 py-3 text-center"><span className={`badge ${getStatusColor(atend.status)}`}>{getStatusLabel(atend.status)}</span></td>
-                    <td className="px-4 py-3 text-center">
-                      {atend.status === 'aguardando' && (
-                        <button onClick={() => cancelarAtendimento(atend)} className="text-red-500 hover:text-red-700 transition-colors" title="Cancelar">
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {fila.map((atend, i) => {
+                  const priority = getPriorityBadge(atend.paciente?.data_nascimento || '');
+                  return (
+                    <tr key={atend.id} className="table-row">
+                      <td className="px-4 py-3 text-sm font-mono text-surface-400">{i + 1}</td>
+                      <td className="px-4 py-3">
+                        <p className="text-sm font-medium text-surface-800">{atend.paciente?.nome_completo}</p>
+                        <p className="text-xs text-surface-400">{maskCPF(atend.paciente?.cpf || '')}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-surface-700">{calcularIdade(atend.paciente?.data_nascimento || '')}a</span>
+                          {priority && (
+                            <span className={cn('badge text-xs px-2 py-1', priority.className)}>
+                              {priority.label}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={cn('badge text-xs', atend.procedimento?.tipo === 'bilateral' ? 'bg-purple-100 text-purple-700' : 'bg-sky-100 text-sky-700')}>
+                          {atend.procedimento?.tipo === 'bilateral' ? 'Bilateral' : 'Unilateral'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-surface-600">Dr(a). {atend.profissional?.nome_completo?.split(' ')[0]}</td>
+                      <td className="px-4 py-3 text-sm text-surface-500">{atend.hora_chegada ? formatDate(atend.hora_chegada, 'HH:mm') : '—'}</td>
+                      <td className={cn('px-4 py-3 text-sm', getWaitTimeColor(atend.hora_chegada))}>
+                        {calcWaitTime(atend.hora_chegada)}
+                      </td>
+                      <td className="px-4 py-3 text-center"><span className={`badge ${getStatusColor(atend.status)}`}>{getStatusLabel(atend.status)}</span></td>
+                      <td className="px-4 py-3 text-center">
+                        {atend.status === 'aguardando' && (
+                          <button onClick={() => cancelarAtendimento(atend)} className="text-red-500 hover:text-red-700 transition-colors" title="Cancelar">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
+        )}
+      </div>
+
+      {/* Queue Cards - Mobile */}
+      <div className="md:hidden space-y-4">
+        {fila.length === 0 ? (
+          <EmptyState icon="🏥" title="Nenhum paciente na fila" description='Clique em "Novo Atendimento" para comecar' />
+        ) : (
+          <>
+            {/* Aguardando Section */}
+            {aguardando.length > 0 && (
+              <div className="space-y-3">
+                <div className="px-4 py-2 bg-amber-100 rounded-lg">
+                  <h3 className="font-semibold text-amber-900">Aguardando ({aguardando.length})</h3>
+                </div>
+                {aguardando.map((atend) => {
+                  const priority = getPriorityBadge(atend.paciente?.data_nascimento || '');
+                  const position = fila.findIndex(f => f.id === atend.id) + 1;
+                  return (
+                    <div key={atend.id} className="bg-white rounded-lg border border-surface-200 p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-surface-900 text-sm">{atend.paciente?.nome_completo}</p>
+                          <p className="text-xs text-surface-500">{maskCPF(atend.paciente?.cpf || '')}</p>
+                        </div>
+                        <div className="text-center flex-shrink-0">
+                          <p className="text-2xl font-bold text-amber-600">{position}</p>
+                          <p className="text-xs text-surface-500">posição</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-semibold text-surface-700 bg-surface-100 px-2 py-1 rounded">{calcularIdade(atend.paciente?.data_nascimento || '')}a</span>
+                        {priority && (
+                          <span className={cn('badge text-xs px-2 py-1', priority.className)}>
+                            {priority.label}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <p className="text-surface-500">Procedimento</p>
+                          <p className="font-medium text-surface-700">{atend.procedimento?.tipo === 'bilateral' ? 'Bilateral' : 'Unilateral'}</p>
+                        </div>
+                        <div>
+                          <p className="text-surface-500">Médico</p>
+                          <p className="font-medium text-surface-700">Dr(a). {atend.profissional?.nome_completo?.split(' ')[0]}</p>
+                        </div>
+                        <div>
+                          <p className="text-surface-500">Chegada</p>
+                          <p className="font-medium text-surface-700">{atend.hora_chegada ? formatDate(atend.hora_chegada, 'HH:mm') : '—'}</p>
+                        </div>
+                        <div>
+                          <p className="text-surface-500">Espera</p>
+                          <p className={cn('font-semibold', getWaitTimeColor(atend.hora_chegada))}>{calcWaitTime(atend.hora_chegada)}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2 pt-2 border-t border-surface-100">
+                        {atend.status === 'aguardando' && (
+                          <button onClick={() => cancelarAtendimento(atend)} className="flex-1 text-sm px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors font-medium">
+                            Cancelar
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Em Atendimento Section */}
+            {emAtendimento.length > 0 && (
+              <div className="space-y-3">
+                <div className="px-4 py-2 bg-blue-100 rounded-lg">
+                  <h3 className="font-semibold text-blue-900">Em Atendimento ({emAtendimento.length})</h3>
+                </div>
+                {emAtendimento.map((atend) => {
+                  const priority = getPriorityBadge(atend.paciente?.data_nascimento || '');
+                  return (
+                    <div key={atend.id} className="bg-white rounded-lg border border-surface-200 p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-surface-900 text-sm">{atend.paciente?.nome_completo}</p>
+                          <p className="text-xs text-surface-500">{maskCPF(atend.paciente?.cpf || '')}</p>
+                        </div>
+                        <span className={`badge text-xs ${getStatusColor(atend.status)}`}>{getStatusLabel(atend.status)}</span>
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-semibold text-surface-700 bg-surface-100 px-2 py-1 rounded">{calcularIdade(atend.paciente?.data_nascimento || '')}a</span>
+                        {priority && (
+                          <span className={cn('badge text-xs px-2 py-1', priority.className)}>
+                            {priority.label}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <p className="text-surface-500">Procedimento</p>
+                          <p className="font-medium text-surface-700">{atend.procedimento?.tipo === 'bilateral' ? 'Bilateral' : 'Unilateral'}</p>
+                        </div>
+                        <div>
+                          <p className="text-surface-500">Médico</p>
+                          <p className="font-medium text-surface-700">Dr(a). {atend.profissional?.nome_completo?.split(' ')[0]}</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Finalizados Section */}
+            {finalizados.length > 0 && (
+              <div className="space-y-3">
+                <div className="px-4 py-2 bg-emerald-100 rounded-lg">
+                  <h3 className="font-semibold text-emerald-900">Finalizados ({finalizados.length})</h3>
+                </div>
+                {finalizados.map((atend) => {
+                  return (
+                    <div key={atend.id} className="bg-white rounded-lg border border-surface-200 p-4 space-y-3 opacity-75">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-surface-900 text-sm">{atend.paciente?.nome_completo}</p>
+                          <p className="text-xs text-surface-500">{maskCPF(atend.paciente?.cpf || '')}</p>
+                        </div>
+                        <span className={`badge text-xs ${getStatusColor(atend.status)}`}>{getStatusLabel(atend.status)}</span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <p className="text-surface-500">Procedimento</p>
+                          <p className="font-medium text-surface-700">{atend.procedimento?.tipo === 'bilateral' ? 'Bilateral' : 'Unilateral'}</p>
+                        </div>
+                        <div>
+                          <p className="text-surface-500">Médico</p>
+                          <p className="font-medium text-surface-700">Dr(a). {atend.profissional?.nome_completo?.split(' ')[0]}</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -268,8 +478,8 @@ export default function RecepcaoPage() {
 
       {/* New Atendimento Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-start justify-center p-4 pt-12 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-elevated max-w-2xl w-full mb-8">
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-start justify-center p-4 pt-4 overflow-y-auto md:pt-12">
+          <div className="bg-white rounded-2xl shadow-elevated max-w-2xl w-full mb-8 min-h-screen md:min-h-auto md:rounded-2xl">
             <div className="flex items-center justify-between px-6 py-4 border-b border-surface-100 sticky top-0 bg-white rounded-t-2xl z-10">
               <h2 className="text-lg font-display font-bold text-surface-900">Novo Atendimento</h2>
               <button onClick={resetAndClose} className="p-2 rounded-lg hover:bg-surface-100">
@@ -377,7 +587,7 @@ export default function RecepcaoPage() {
             </div>
 
             {(selectedPaciente || isNewPatient) && (
-              <div className="px-6 py-4 border-t border-surface-100 flex justify-end gap-3 sticky bottom-0 bg-white rounded-b-2xl">
+              <div className="px-6 py-4 border-t border-surface-100 flex flex-col-reverse md:flex-row justify-end gap-3 sticky bottom-0 bg-white rounded-b-2xl">
                 <button onClick={resetAndClose} className="btn-secondary">Cancelar</button>
                 <button onClick={handleSaveAndQueue} disabled={loading} className="btn-success">
                   {loading ? (
