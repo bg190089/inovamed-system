@@ -1,0 +1,70 @@
+import { z } from 'zod';
+
+function isValidCPF(cpf: string): boolean {
+  const nums = cpf.replace(/\D/g, '');
+  if (nums.length !== 11) return false;
+  if (/^(\d)\1+$/.test(nums)) return false;
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += parseInt(nums[i]) * (10 - i);
+  let rest = (sum * 10) % 11;
+  if (rest === 10) rest = 0;
+  if (rest !== parseInt(nums[9])) return false;
+  sum = 0;
+  for (let i = 0; i < 10; i++) sum += parseInt(nums[i]) * (11 - i);
+  rest = (sum * 10) % 11;
+  if (rest === 10) rest = 0;
+  return rest === parseInt(nums[10]);
+}
+
+export const pacienteSchema = z.object({
+  nome_completo: z.string().min(5, 'Nome deve ter pelo menos 5 caracteres').max(200).transform((v) => v.toUpperCase().trim()),
+  sexo: z.enum(['M', 'F'], { required_error: 'Selecione o sexo' }),
+  data_nascimento: z.string().min(1, 'Data de nascimento obrigatoria').refine((v) => { const d = new Date(v); return d < new Date() && d > new Date('1900-01-01'); }, 'Data invalida'),
+  cpf: z.string().min(1, 'CPF obrigatorio').transform((v) => v.replace(/\D/g, '')).refine((v) => v.length === 11, 'CPF deve ter 11 digitos').refine(isValidCPF, 'CPF invalido'),
+  cns: z.string().optional().transform((v) => v?.replace(/\D/g, '') || ''),
+  cep: z.string().optional().transform((v) => v?.replace(/\D/g, '') || ''),
+  logradouro: z.string().optional().default(''),
+  numero: z.string().optional().default(''),
+  complemento: z.string().optional().default(''),
+  bairro: z.string().optional().default(''),
+  cidade: z.string().optional().default(''),
+  uf: z.string().max(2).default('BA'),
+  telefone: z.string().optional().transform((v) => v?.replace(/\D/g, '') || ''),
+});
+
+export const prontuarioSchema = z.object({
+  doppler: z.string().optional().default(''),
+  anamnese: z.string().optional().default(''),
+  descricao_procedimento: z.string().optional().default(''),
+  observacoes: z.string().optional().default(''),
+});
+
+export const profissionalSchema = z.object({
+  email: z.string().email('E-mail invalido'),
+  password: z.string().min(6, 'Senha deve ter pelo menos 6 caracteres'),
+  nome_completo: z.string().min(3, 'Nome obrigatorio').transform((v) => v.toUpperCase().trim()),
+  cns: z.string().optional().default(''),
+  cpf: z.string().optional().default(''),
+  cbo: z.string().min(1, 'CBO obrigatorio').default('225203'),
+  crm: z.string().optional().default(''),
+  role: z.enum(['admin', 'gestor', 'medico', 'recepcionista']).default('medico'),
+});
+
+export const unidadeSchema = z.object({
+  municipio_id: z.string().uuid('Selecione o municipio'),
+  nome: z.string().min(3, 'Nome da unidade obrigatorio'),
+  cnes: z.string().length(7, 'CNES deve ter 7 digitos'),
+  endereco: z.string().optional().default(''),
+});
+
+export const municipioSchema = z.object({
+  nome: z.string().min(2, 'Nome do municipio obrigatorio'),
+  codigo_ibge: z.string().optional().default(''),
+  uf: z.string().max(2).default('BA'),
+});
+
+export type PacienteFormData = z.infer<typeof pacienteSchema>;
+export type ProntuarioFormData = z.infer<typeof prontuarioSchema>;
+export type ProfissionalFormData = z.infer<typeof profissionalSchema>;
+export type UnidadeFormData = z.infer<typeof unidadeSchema>;
+export type MunicipioFormData = z.infer<typeof municipioSchema>;
