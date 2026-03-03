@@ -91,6 +91,7 @@ export default function RecepcaoPage() {
   const [uploadDesc, setUploadDesc] = useState('');
   const [qrUrl, setQrUrl] = useState('');
   const [qrDataUrl, setQrDataUrl] = useState('');
+  const [filaTab, setFilaTab] = useState<'aguardando' | 'atendidos'>('aguardando');
 
   const loadFila = useCallback(async () => {
     if (!selectedUnidade) return;
@@ -514,6 +515,11 @@ export default function RecepcaoPage() {
   const emAtendimento = fila.filter(f => f.status === 'em_atendimento');
   const finalizados = fila.filter(f => f.status === 'finalizado');
 
+  // Filter for tabs: Aguardando tab shows active patients, Atendidos shows finalizados
+  const filaParaAguardando = [...aguardandoTriagem, ...aguardando, ...emAtendimento];
+  const filaParaAtendidos = finalizados;
+  const filaTabFiltrada = filaTab === 'aguardando' ? filaParaAguardando : filaParaAtendidos;
+
   // Use refreshKey to trigger re-renders for wait time updates
   const _ = refreshKey;
 
@@ -556,8 +562,35 @@ export default function RecepcaoPage() {
           <h2 className="font-display font-semibold text-surface-800">Fila do Dia</h2>
           <button onClick={loadFila} className="text-xs text-brand-600 hover:text-brand-700 font-medium">Atualizar</button>
         </div>
-        {fila.length === 0 ? (
-          <EmptyState icon="🏥" title="Nenhum paciente na fila" description='Clique em "Novo Atendimento" para comecar' />
+
+        {/* Tab Bar */}
+        <div className="px-6 py-3 border-b border-surface-100 flex gap-4 bg-surface-50">
+          <button
+            onClick={() => setFilaTab('aguardando')}
+            className={cn(
+              'px-4 py-2 font-medium text-sm rounded-lg transition-colors',
+              filaTab === 'aguardando'
+                ? 'bg-brand-500 text-white'
+                : 'text-surface-600 hover:bg-surface-200'
+            )}
+          >
+            Aguardando ({filaParaAguardando.length})
+          </button>
+          <button
+            onClick={() => setFilaTab('atendidos')}
+            className={cn(
+              'px-4 py-2 font-medium text-sm rounded-lg transition-colors',
+              filaTab === 'atendidos'
+                ? 'bg-brand-500 text-white'
+                : 'text-surface-600 hover:bg-surface-200'
+            )}
+          >
+            Atendidos ({filaParaAtendidos.length})
+          </button>
+        </div>
+
+        {filaTabFiltrada.length === 0 ? (
+          <EmptyState icon="🏥" title={filaTab === 'aguardando' ? 'Nenhum paciente aguardando' : 'Nenhum paciente finalizado'} description={filaTab === 'aguardando' ? 'Clique em "Novo Atendimento" para começar' : 'Nenhum atendimento foi finalizado ainda'} />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -568,15 +601,15 @@ export default function RecepcaoPage() {
                 <th className="px-4 py-3 text-left">Procedimento</th>
                 <th className="px-4 py-3 text-left">Médico</th>
                 <th className="px-4 py-3 text-left">Chegada</th>
-                <th className="px-4 py-3 text-left">Espera</th>
+                {filaTab === 'aguardando' && <th className="px-4 py-3 text-left">Espera</th>}
                 <th className="px-4 py-3 text-center">Status</th>
                 <th className="px-4 py-3 text-center w-16">Ações</th>
               </tr></thead>
               <tbody>
-                {fila.map((atend, i) => {
+                {filaTabFiltrada.map((atend, i) => {
                   const priority = getPriorityBadge(atend.paciente?.data_nascimento || '');
                   return (
-                    <tr key={atend.id} className="table-row">
+                    <tr key={atend.id} className={cn('table-row', filaTab === 'atendidos' && 'opacity-75')}>
                       <td className="px-4 py-3 text-sm font-mono text-surface-400">{i + 1}</td>
                       <td className="px-4 py-3">
                         <p className="text-sm font-medium text-surface-800">{atend.paciente?.nome_completo}</p>
@@ -599,9 +632,11 @@ export default function RecepcaoPage() {
                       </td>
                       <td className="px-4 py-3 text-sm text-surface-600">Dr(a). {atend.profissional?.nome_completo?.split(' ')[0]}</td>
                       <td className="px-4 py-3 text-sm text-surface-500">{atend.hora_chegada ? formatDate(atend.hora_chegada, 'HH:mm') : '—'}</td>
-                      <td className={cn('px-4 py-3 text-sm', getWaitTimeColor(atend.hora_chegada))}>
-                        {calcWaitTime(atend.hora_chegada)}
-                      </td>
+                      {filaTab === 'aguardando' && (
+                        <td className={cn('px-4 py-3 text-sm', getWaitTimeColor(atend.hora_chegada))}>
+                          {calcWaitTime(atend.hora_chegada)}
+                        </td>
+                      )}
                       <td className="px-4 py-3 text-center"><span className={`badge ${getStatusColor(atend.status)}`}>{getStatusLabel(atend.status)}</span></td>
                       <td className="px-4 py-3 text-center">
                         <div className="flex items-center justify-center gap-1">
@@ -631,17 +666,45 @@ export default function RecepcaoPage() {
 
       {/* Queue Cards - Mobile */}
       <div className="md:hidden space-y-4">
-        {fila.length === 0 ? (
-          <EmptyState icon="🏥" title="Nenhum paciente na fila" description='Clique em "Novo Atendimento" para comecar' />
+        {/* Tab Bar Mobile */}
+        <div className="flex gap-2 bg-surface-100 p-2 rounded-lg">
+          <button
+            onClick={() => setFilaTab('aguardando')}
+            className={cn(
+              'flex-1 px-3 py-2 font-medium text-xs rounded-lg transition-colors',
+              filaTab === 'aguardando'
+                ? 'bg-brand-500 text-white'
+                : 'text-surface-600 hover:bg-surface-200'
+            )}
+          >
+            Aguardando ({filaParaAguardando.length})
+          </button>
+          <button
+            onClick={() => setFilaTab('atendidos')}
+            className={cn(
+              'flex-1 px-3 py-2 font-medium text-xs rounded-lg transition-colors',
+              filaTab === 'atendidos'
+                ? 'bg-brand-500 text-white'
+                : 'text-surface-600 hover:bg-surface-200'
+            )}
+          >
+            Atendidos ({filaParaAtendidos.length})
+          </button>
+        </div>
+
+        {filaTabFiltrada.length === 0 ? (
+          <EmptyState icon="🏥" title={filaTab === 'aguardando' ? 'Nenhum paciente aguardando' : 'Nenhum paciente finalizado'} description={filaTab === 'aguardando' ? 'Clique em "Novo Atendimento" para começar' : 'Nenhum atendimento foi finalizado ainda'} />
         ) : (
           <>
-            {/* Aguardando Section */}
-            {aguardando.length > 0 && (
-              <div className="space-y-3">
-                <div className="px-4 py-2 bg-amber-100 rounded-lg">
-                  <h3 className="font-semibold text-amber-900">Aguardando ({aguardando.length})</h3>
-                </div>
-                {aguardando.map((atend) => {
+            {filaTab === 'aguardando' && (
+              <>
+                {/* Aguardando Section */}
+                {aguardando.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="px-4 py-2 bg-amber-100 rounded-lg">
+                      <h3 className="font-semibold text-amber-900">Aguardando ({aguardando.length})</h3>
+                    </div>
+                    {aguardando.map((atend) => {
                   const priority = getPriorityBadge(atend.paciente?.data_nascimento || '');
                   const position = fila.findIndex(f => f.id === atend.id) + 1;
                   return (
@@ -702,59 +765,117 @@ export default function RecepcaoPage() {
                       </div>
                     </div>
                   );
-                })}
-              </div>
-            )}
+                    })}
+                  </div>
+                )}
 
-            {/* Em Atendimento Section */}
-            {emAtendimento.length > 0 && (
-              <div className="space-y-3">
-                <div className="px-4 py-2 bg-blue-100 rounded-lg">
-                  <h3 className="font-semibold text-blue-900">Em Atendimento ({emAtendimento.length})</h3>
-                </div>
-                {emAtendimento.map((atend) => {
-                  const priority = getPriorityBadge(atend.paciente?.data_nascimento || '');
-                  return (
-                    <div key={atend.id} className="bg-white rounded-lg border border-surface-200 p-4 space-y-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-surface-900 text-sm">{atend.paciente?.nome_completo}</p>
-                          <p className="text-xs text-surface-500">{maskCPF(atend.paciente?.cpf || '')}</p>
-                        </div>
-                        <span className={`badge text-xs ${getStatusColor(atend.status)}`}>{getStatusLabel(atend.status)}</span>
-                      </div>
-
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-semibold text-surface-700 bg-surface-100 px-2 py-1 rounded">{calcularIdade(atend.paciente?.data_nascimento || '')}a</span>
-                        {priority && (
-                          <span className={cn('badge text-xs px-2 py-1', priority.className)}>
-                            {priority.label}
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div>
-                          <p className="text-surface-500">Procedimento</p>
-                          <p className="font-medium text-surface-700">{atend.procedimento?.tipo === 'bilateral' ? 'Bilateral' : 'Unilateral'}</p>
-                        </div>
-                        <div>
-                          <p className="text-surface-500">Médico</p>
-                          <p className="font-medium text-surface-700">Dr(a). {atend.profissional?.nome_completo?.split(' ')[0]}</p>
-                        </div>
-                      </div>
+                {/* Em Atendimento Section */}
+                {emAtendimento.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="px-4 py-2 bg-blue-100 rounded-lg">
+                      <h3 className="font-semibold text-blue-900">Em Atendimento ({emAtendimento.length})</h3>
                     </div>
-                  );
-                })}
-              </div>
+                    {emAtendimento.map((atend) => {
+                      const priority = getPriorityBadge(atend.paciente?.data_nascimento || '');
+                      return (
+                        <div key={atend.id} className="bg-white rounded-lg border border-surface-200 p-4 space-y-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-surface-900 text-sm">{atend.paciente?.nome_completo}</p>
+                              <p className="text-xs text-surface-500">{maskCPF(atend.paciente?.cpf || '')}</p>
+                            </div>
+                            <span className={`badge text-xs ${getStatusColor(atend.status)}`}>{getStatusLabel(atend.status)}</span>
+                          </div>
+
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-semibold text-surface-700 bg-surface-100 px-2 py-1 rounded">{calcularIdade(atend.paciente?.data_nascimento || '')}a</span>
+                            {priority && (
+                              <span className={cn('badge text-xs px-2 py-1', priority.className)}>
+                                {priority.label}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                              <p className="text-surface-500">Procedimento</p>
+                              <p className="font-medium text-surface-700">{atend.procedimento?.tipo === 'bilateral' ? 'Bilateral' : 'Unilateral'}</p>
+                            </div>
+                            <div>
+                              <p className="text-surface-500">Médico</p>
+                              <p className="font-medium text-surface-700">Dr(a). {atend.profissional?.nome_completo?.split(' ')[0]}</p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Aguardando Triagem Section */}
+                {aguardandoTriagem.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="px-4 py-2 bg-purple-100 rounded-lg">
+                      <h3 className="font-semibold text-purple-900">Ag. Triagem ({aguardandoTriagem.length})</h3>
+                    </div>
+                    {aguardandoTriagem.map((atend) => {
+                      const priority = getPriorityBadge(atend.paciente?.data_nascimento || '');
+                      return (
+                        <div key={atend.id} className="bg-white rounded-lg border border-surface-200 p-4 space-y-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-surface-900 text-sm">{atend.paciente?.nome_completo}</p>
+                              <p className="text-xs text-surface-500">{maskCPF(atend.paciente?.cpf || '')}</p>
+                            </div>
+                            <span className={`badge text-xs ${getStatusColor(atend.status)}`}>{getStatusLabel(atend.status)}</span>
+                          </div>
+
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-semibold text-surface-700 bg-surface-100 px-2 py-1 rounded">{calcularIdade(atend.paciente?.data_nascimento || '')}a</span>
+                            {priority && (
+                              <span className={cn('badge text-xs px-2 py-1', priority.className)}>
+                                {priority.label}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                              <p className="text-surface-500">Procedimento</p>
+                              <p className="font-medium text-surface-700">{atend.procedimento?.tipo === 'bilateral' ? 'Bilateral' : 'Unilateral'}</p>
+                            </div>
+                            <div>
+                              <p className="text-surface-500">Médico</p>
+                              <p className="font-medium text-surface-700">Dr(a). {atend.profissional?.nome_completo?.split(' ')[0]}</p>
+                            </div>
+                          </div>
+
+                          <div className="flex gap-2 pt-2 border-t border-surface-100">
+                            <button onClick={() => openDocModal(atend)} className="flex-1 text-sm px-3 py-2 text-surface-600 hover:bg-surface-50 rounded-lg transition-colors font-medium">
+                              Documentos
+                            </button>
+                            {canEditPatient(atend.status) && (
+                              <button onClick={() => openEditModal(atend)} className="flex-1 text-sm px-3 py-2 text-brand-600 hover:bg-brand-50 rounded-lg transition-colors font-medium">
+                                Editar
+                              </button>
+                            )}
+                            {(atend.status === 'aguardando' || atend.status === 'aguardando_triagem') && (
+                              <button onClick={() => cancelarAtendimento(atend)} className="flex-1 text-sm px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors font-medium">
+                                Cancelar
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
             )}
 
-            {/* Finalizados Section */}
-            {finalizados.length > 0 && (
-              <div className="space-y-3">
-                <div className="px-4 py-2 bg-emerald-100 rounded-lg">
-                  <h3 className="font-semibold text-emerald-900">Finalizados ({finalizados.length})</h3>
-                </div>
+            {filaTab === 'atendidos' && (
+              <>
+                {/* Finalizados Section */}
                 {finalizados.map((atend) => {
                   return (
                     <div key={atend.id} className="bg-white rounded-lg border border-surface-200 p-4 space-y-3 opacity-75">
@@ -776,10 +897,16 @@ export default function RecepcaoPage() {
                           <p className="font-medium text-surface-700">Dr(a). {atend.profissional?.nome_completo?.split(' ')[0]}</p>
                         </div>
                       </div>
+
+                      <div className="flex gap-2 pt-2 border-t border-surface-100">
+                        <button onClick={() => openDocModal(atend)} className="flex-1 text-sm px-3 py-2 text-surface-600 hover:bg-surface-50 rounded-lg transition-colors font-medium">
+                          Documentos
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
-              </div>
+              </>
             )}
           </>
         )}

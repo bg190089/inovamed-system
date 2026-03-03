@@ -6,7 +6,7 @@ import { useSupabase } from '@/hooks/useSupabase';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { PacienteService, AgendamentoService, AtendimentoService } from '@/lib/services';
 import { toast } from 'sonner';
-import { maskCPF, formatDate, calcularIdade, cn } from '@/lib/utils';
+import { maskCPF, formatDate, calcularIdade, cn, unmask } from '@/lib/utils';
 import { ConfirmDialog, EmptyState, PageHeader } from '@/components/ui';
 import type { Agendamento, Paciente, Procedimento, Profissional } from '@/types';
 
@@ -33,6 +33,13 @@ export default function AgendamentoPage() {
   const [selectedProfissionalFilter, setSelectedProfissionalFilter] = useState<string>('');
   const [prefilledRetorno, setPrefilledRetorno] = useState<Agendamento | null>(null);
   const [sessoesPaciente, setSessoesPaciente] = useState<number>(0);
+  const [isNewPatientAgend, setIsNewPatientAgend] = useState(false);
+  const [newPatientForm, setNewPatientForm] = useState({
+    nome_completo: '',
+    cpf: '',
+    data_nascimento: '',
+    sexo: 'F' as 'M' | 'F',
+  });
 
   const [form, setForm] = useState({
     data_agendamento: new Date().toISOString().split('T')[0],
@@ -166,6 +173,45 @@ export default function AgendamentoPage() {
     } catch { setSessoesPaciente(0); }
   }
 
+  async function handleCreateNewPatientAgend() {
+    if (!newPatientForm.nome_completo.trim()) {
+      toast.error('Nome completo é obrigatório');
+      return;
+    }
+    if (!newPatientForm.cpf.trim() || newPatientForm.cpf.replace(/\D/g, '').length !== 11) {
+      toast.error('CPF inválido');
+      return;
+    }
+    if (!newPatientForm.data_nascimento) {
+      toast.error('Data de nascimento é obrigatória');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const newPac = await pacienteService.criar({
+        nome_completo: newPatientForm.nome_completo.toUpperCase(),
+        cpf: unmask(newPatientForm.cpf),
+        data_nascimento: newPatientForm.data_nascimento,
+        sexo: newPatientForm.sexo,
+      } as any);
+
+      await selectPaciente(newPac);
+      setIsNewPatientAgend(false);
+      setNewPatientForm({
+        nome_completo: '',
+        cpf: '',
+        data_nascimento: '',
+        sexo: 'F',
+      });
+      toast.success(`Paciente ${newPac.nome_completo} cadastrado com sucesso`);
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao cadastrar paciente');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function handleCreateAgendamento() {
     if (!selectedPaciente) {
       toast.error('Selecione um paciente');
@@ -221,6 +267,13 @@ export default function AgendamentoPage() {
     setPacienteHistory([]);
     setPrefilledRetorno(null);
     setSessoesPaciente(0);
+    setIsNewPatientAgend(false);
+    setNewPatientForm({
+      nome_completo: '',
+      cpf: '',
+      data_nascimento: '',
+      sexo: 'F',
+    });
     setForm({
       data_agendamento: new Date().toISOString().split('T')[0],
       horario_inicio: '09:00',
@@ -531,21 +584,23 @@ export default function AgendamentoPage() {
                             <>
                               <button
                                 onClick={() => confirmActionAgendamento(agendamento, 'confirmar')}
-                                className="text-green-600 hover:text-green-700 transition-colors"
+                                className="inline-flex items-center gap-1 px-2 py-1.5 rounded-full bg-green-50 text-green-600 hover:bg-green-100 transition-colors text-xs font-medium"
                                 title="Confirmar"
                               >
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                 </svg>
+                                Confirmar
                               </button>
                               <button
                                 onClick={() => confirmActionAgendamento(agendamento, 'cancelar')}
-                                className="text-red-600 hover:text-red-700 transition-colors"
+                                className="inline-flex items-center gap-1 px-2 py-1.5 rounded-full bg-red-50 text-red-600 hover:bg-red-100 transition-colors text-xs font-medium"
                                 title="Cancelar"
                               >
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                 </svg>
+                                Cancelar
                               </button>
                             </>
                           )}
@@ -553,28 +608,30 @@ export default function AgendamentoPage() {
                             <>
                               <button
                                 onClick={() => confirmActionAgendamento(agendamento, 'realizado')}
-                                className="text-emerald-600 hover:text-emerald-700 transition-colors"
+                                className="inline-flex items-center gap-1 px-2 py-1.5 rounded-full bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors text-xs font-medium"
                                 title="Marcar como Realizado"
                               >
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
+                                Realizado
                               </button>
                               <button
                                 onClick={() => confirmActionAgendamento(agendamento, 'faltou')}
-                                className="text-yellow-600 hover:text-yellow-700 transition-colors"
+                                className="inline-flex items-center gap-1 px-2 py-1.5 rounded-full bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors text-xs font-medium"
                                 title="Marcar como Falta"
                               >
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4v.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
+                                Faltou
                               </button>
                             </>
                           )}
                           {agendamento.status === 'realizado' && (
                             <button
                               onClick={() => openRetornoModal(agendamento)}
-                              className="text-brand-600 hover:text-brand-700 transition-colors text-xs font-medium px-2 py-1 rounded hover:bg-brand-50"
+                              className="inline-flex items-center gap-1 px-2 py-1.5 rounded-full bg-brand-50 text-brand-600 hover:bg-brand-100 transition-colors text-xs font-medium"
                               title="Agendar Retorno"
                             >
                               Retorno
@@ -739,6 +796,93 @@ export default function AgendamentoPage() {
                           </p>
                         </button>
                       ))}
+                    </div>
+                  )}
+
+                  {!isNewPatientAgend && (
+                    <div className="mt-4 text-center">
+                      <button
+                        onClick={() => setIsNewPatientAgend(true)}
+                        className="text-sm text-brand-600 hover:text-brand-700 font-medium"
+                      >
+                        + Cadastrar Novo Paciente
+                      </button>
+                    </div>
+                  )}
+
+                  {isNewPatientAgend && (
+                    <div className="mt-6 space-y-4 border-t border-surface-200 pt-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-semibold text-surface-800">Dados do Novo Paciente</h3>
+                        <button
+                          onClick={() => setIsNewPatientAgend(false)}
+                          className="text-sm text-surface-500 hover:text-surface-700"
+                        >
+                          ← Voltar
+                        </button>
+                      </div>
+
+                      <div>
+                        <label className="input-label">Nome Completo <span className="text-red-500">*</span></label>
+                        <input
+                          type="text"
+                          value={newPatientForm.nome_completo}
+                          onChange={(e) => setNewPatientForm({ ...newPatientForm, nome_completo: e.target.value })}
+                          className="input-field"
+                          placeholder="NOME COMPLETO"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <label className="input-label">CPF <span className="text-red-500">*</span></label>
+                          <input
+                            type="text"
+                            value={newPatientForm.cpf}
+                            onChange={(e) => setNewPatientForm({ ...newPatientForm, cpf: maskCPF(e.target.value) })}
+                            className="input-field"
+                            placeholder="000.000.000-00"
+                            maxLength={14}
+                          />
+                        </div>
+                        <div>
+                          <label className="input-label">Data Nascimento <span className="text-red-500">*</span></label>
+                          <input
+                            type="date"
+                            value={newPatientForm.data_nascimento}
+                            onChange={(e) => setNewPatientForm({ ...newPatientForm, data_nascimento: e.target.value })}
+                            className="input-field"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="input-label">Sexo</label>
+                        <select
+                          value={newPatientForm.sexo}
+                          onChange={(e) => setNewPatientForm({ ...newPatientForm, sexo: e.target.value as 'M' | 'F' })}
+                          className="input-field"
+                        >
+                          <option value="F">Feminino</option>
+                          <option value="M">Masculino</option>
+                        </select>
+                      </div>
+
+                      <div className="flex gap-2 pt-2">
+                        <button
+                          onClick={() => setIsNewPatientAgend(false)}
+                          className="flex-1 btn-secondary text-sm"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          onClick={handleCreateNewPatientAgend}
+                          disabled={loading}
+                          className="flex-1 btn-primary text-sm"
+                        >
+                          {loading ? 'Cadastrando...' : 'Cadastrar e Selecionar'}
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
