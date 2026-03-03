@@ -9,6 +9,7 @@ const ROUTE_ROLES: Record<string, string[]> = {
   '/recepcao': ['admin', 'gestor', 'recepcionista'],
   '/consultorio': ['admin', 'gestor', 'medico'],
   '/agendamento': ['admin', 'gestor', 'recepcionista', 'medico'],
+  '/assinatura-medico': ['admin', 'medico'],
 };
 
 export async function updateSession(request: NextRequest) {

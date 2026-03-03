@@ -223,7 +223,19 @@ export default function ConsultorioPage() {
     if (!atendimentoAtual) return;
     setSaving(true);
     try {
-      await service.salvarProntuario(atendimentoAtual.id, prontuario, finalizar);
+      // If finalizing, include doctor signature
+      let prontuarioData: Record<string, any> = { ...prontuario };
+      if (finalizar && user) {
+        const { data: profData } = await supabase
+          .from('profissionais')
+          .select('assinatura_digital')
+          .eq('id', user.id)
+          .single();
+        if (profData?.assinatura_digital) {
+          prontuarioData.assinatura_medico = profData.assinatura_digital;
+        }
+      }
+      await service.salvarProntuario(atendimentoAtual.id, prontuarioData, finalizar);
       if (finalizar) {
         toast.success('Atendimento finalizado com sucesso');
         setAtendimentoAtual(null);
