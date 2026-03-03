@@ -14,7 +14,7 @@ export class AgendamentoService {
         .select(FULL_SELECT)
         .eq('data_agendamento', data)
         .eq('unidade_id', unidadeId)
-        .order('hora_inicio', { ascending: true });
+        .order('horario_inicio', { ascending: true });
       if (error) throw error;
       return agendamentos || [];
     } catch {
@@ -30,7 +30,7 @@ export class AgendamentoService {
       .gte('data_agendamento', dataInicio)
       .lte('data_agendamento', dataFim)
       .order('data_agendamento', { ascending: true })
-      .order('hora_inicio', { ascending: true });
+      .order('horario_inicio', { ascending: true });
     if (error) throw new Error(error.message);
     return data || [];
   }

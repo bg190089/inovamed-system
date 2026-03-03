@@ -36,8 +36,8 @@ export default function AgendamentoPage() {
 
   const [form, setForm] = useState({
     data_agendamento: new Date().toISOString().split('T')[0],
-    hora_inicio: '09:00',
-    hora_fim: '10:00',
+    horario_inicio: '09:00',
+    horario_fim: '10:00',
     procedimento_id: '',
     profissional_id: '',
     observacoes: '',
@@ -194,8 +194,8 @@ export default function AgendamentoPage() {
         profissional_id: form.profissional_id,
         procedimento_id: form.procedimento_id,
         data_agendamento: form.data_agendamento,
-        hora_inicio: form.hora_inicio,
-        hora_fim: form.hora_fim || null,
+        horario_inicio: form.horario_inicio,
+        horario_fim: form.horario_fim || null,
         observacoes: fullObs,
         numero_sessao: sessoesPaciente + 1,
         status: 'agendado',
@@ -221,8 +221,8 @@ export default function AgendamentoPage() {
     setSessoesPaciente(0);
     setForm({
       data_agendamento: new Date().toISOString().split('T')[0],
-      hora_inicio: '09:00',
-      hora_fim: '10:00',
+      horario_inicio: '09:00',
+      horario_fim: '10:00',
       procedimento_id: '',
       profissional_id: '',
       observacoes: '',
@@ -248,8 +248,8 @@ export default function AgendamentoPage() {
 
     setForm({
       data_agendamento: proximaData,
-      hora_inicio: agendamento.hora_inicio,
-      hora_fim: agendamento.hora_fim || '10:00',
+      horario_inicio: agendamento.horario_inicio,
+      horario_fim: agendamento.horario_fim || '10:00',
       procedimento_id: agendamento.procedimento_id,
       profissional_id: agendamento.profissional_id,
       observacoes: '',
@@ -517,7 +517,7 @@ export default function AgendamentoPage() {
                       </td>
                       <td className="px-4 py-3 text-sm text-surface-600">Dr(a). {agendamento.profissional?.nome_completo?.split(' ')[0]}</td>
                       <td className="px-4 py-3 text-sm text-surface-500">
-                        {agendamento.hora_inicio} {agendamento.hora_fim ? `- ${agendamento.hora_fim}` : ''}
+                        {agendamento.horario_inicio} {agendamento.horario_fim ? `- ${agendamento.horario_fim}` : ''}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span className={`badge ${getStatusColor(agendamento.status)}`}>{getStatusLabel(agendamento.status)}</span>
@@ -626,7 +626,7 @@ export default function AgendamentoPage() {
                   {/* Details */}
                   <div className="space-y-1 text-xs text-surface-600 bg-surface-50 p-2 rounded">
                     <div><span className="font-medium">Profissional:</span> Dr(a). {agendamento.profissional?.nome_completo?.split(' ')[0]}</div>
-                    <div><span className="font-medium">Horário:</span> {agendamento.hora_inicio} {agendamento.hora_fim ? `- ${agendamento.hora_fim}` : ''}</div>
+                    <div><span className="font-medium">Horário:</span> {agendamento.horario_inicio} {agendamento.horario_fim ? `- ${agendamento.horario_fim}` : ''}</div>
                   </div>
 
                   {/* Actions */}
@@ -768,7 +768,7 @@ export default function AgendamentoPage() {
                         {pacienteHistory.map((agend) => (
                           <div key={agend.id} className="text-xs p-2 bg-white rounded border border-surface-100">
                             <div className="flex items-center justify-between">
-                              <span className="font-medium text-surface-700">{formatDate(agend.data_agendamento, 'dd/MM/yyyy')} às {agend.hora_inicio}</span>
+                              <span className="font-medium text-surface-700">{formatDate(agend.data_agendamento, 'dd/MM/yyyy')} às {agend.horario_inicio}</span>
                               <span className={`badge text-xs ${getStatusColor(agend.status)}`}>{getStatusLabel(agend.status)}</span>
                             </div>
                             <p className="text-surface-600 mt-1">Profissional: Dr(a). {agend.profissional?.nome_completo}</p>
@@ -816,8 +816,8 @@ export default function AgendamentoPage() {
                         <label className="input-label">Hora Início <span className="text-red-500">*</span></label>
                         <input
                           type="time"
-                          value={form.hora_inicio}
-                          onChange={(e) => setForm({ ...form, hora_inicio: e.target.value })}
+                          value={form.horario_inicio}
+                          onChange={(e) => setForm({ ...form, horario_inicio: e.target.value })}
                           className="input-field"
                         />
                       </div>
@@ -825,8 +825,8 @@ export default function AgendamentoPage() {
                         <label className="input-label">Hora Fim</label>
                         <input
                           type="time"
-                          value={form.hora_fim}
-                          onChange={(e) => setForm({ ...form, hora_fim: e.target.value })}
+                          value={form.horario_fim}
+                          onChange={(e) => setForm({ ...form, horario_fim: e.target.value })}
                           className="input-field"
                         />
                       </div>

@@ -170,17 +170,20 @@ export default function TriagemPage() {
       // Create agendamento if data_proxima_sessao is set
       if (form.data_proxima_sessao) {
         try {
-          await supabase.from('agendamentos').insert({
+          const { error: agendError } = await supabase.from('agendamentos').insert({
             empresa_id: selectedEmpresa?.id,
             unidade_id: selectedUnidade.id,
             paciente_id: selectedAtend.paciente_id,
             profissional_id: selectedAtend.profissional_id,
             procedimento_id: selectedAtend.procedimento_id,
             data_agendamento: form.data_proxima_sessao,
-            hora_inicio: '08:00',
+            horario_inicio: '08:00',
+            horario_fim: '09:00',
             numero_sessao: 1,
             status: 'agendado',
+            observacoes: '[SESSAO] Agendado via triagem',
           });
+          if (agendError) throw agendError;
           toast.success(`Agendamento criado para ${formatDate(form.data_proxima_sessao)}`);
         } catch (e: any) {
           console.error('Erro ao criar agendamento:', e);

@@ -137,8 +137,8 @@ export interface Agendamento {
   profissional_id: string;
   procedimento_id: string;
   data_agendamento: string;
-  hora_inicio: string;
-  hora_fim?: string;
+  horario_inicio: string;
+  horario_fim?: string;
   observacoes?: string;
   numero_sessao?: number;
   status: AgendamentoStatus;
