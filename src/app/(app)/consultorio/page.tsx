@@ -53,7 +53,7 @@ export default function ConsultorioPage() {
   const [historico, setHistorico] = useState<Atendimento[]>([]);
   const [showHistorico, setShowHistorico] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [prontuario, setProntuario] = useState({ doppler: '', anamnese: '', descricao_procedimento: '', observacoes: '' });
+  const [prontuario, setProntuario] = useState({ doppler: '', anamnese: '', descricao_procedimento: '', observacoes: '', receita: '' });
 
   // Templates state
   const [templates, setTemplates] = useState<string[]>(DEFAULT_TEMPLATES);
@@ -159,6 +159,7 @@ export default function ConsultorioPage() {
       anamnese: atend.anamnese || '',
       descricao_procedimento: atend.descricao_procedimento || '',
       observacoes: atend.observacoes || '',
+      receita: atend.receita || '',
     });
     const hist = await service.getHistoricoPaciente(atend.paciente_id);
     setHistorico(hist);
@@ -184,6 +185,7 @@ export default function ConsultorioPage() {
             anamnese: atend.anamnese || '',
             descricao_procedimento: atend.descricao_procedimento || '',
             observacoes: atend.observacoes || '',
+            receita: atend.receita || '',
           });
           const hist = await service.getHistoricoPaciente(atend.paciente_id);
           setHistorico(hist);
@@ -239,7 +241,7 @@ export default function ConsultorioPage() {
       if (finalizar) {
         toast.success('Atendimento finalizado com sucesso');
         setAtendimentoAtual(null);
-        setProntuario({ doppler: '', anamnese: '', descricao_procedimento: '', observacoes: '' });
+        setProntuario({ doppler: '', anamnese: '', descricao_procedimento: '', observacoes: '', receita: '' });
         setHistorico([]);
         setShowHistorico(false);
       } else {
@@ -283,28 +285,64 @@ export default function ConsultorioPage() {
     toast.success('Template removido');
   }
 
+  // Helper: get doctor signature + info from multiple sources
+  function getDoctorInfo(atend: Atendimento) {
+    // 1) Try profissional relation (already loaded via FULL_SELECT)
+    const prof = atend.profissional as any;
+    const assinatura = atend.assinatura_medico || prof?.assinatura_digital || '';
+    const nome = prof?.nome_completo || user?.nome_completo || 'Medico';
+    const cbo = prof?.cbo || atend.cbo_profissional || '';
+    const cns = prof?.cns || atend.cns_profissional || '';
+    return { assinatura, nome, cbo, cns };
+  }
+
+  // Common print styles
+  const printStyles = `
+    @page { size: A4; margin: 20mm; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
+    body { padding: 0; color: #1a1a1a; font-size: 11pt; line-height: 1.5; }
+    .header { text-align: center; border-bottom: 3px solid #1e40af; padding-bottom: 12px; margin-bottom: 16px; }
+    .header h1 { font-size: 16pt; color: #1e40af; margin-bottom: 2px; }
+    .header p { font-size: 9pt; color: #555; }
+    .section { margin-bottom: 14px; }
+    .section-title { font-size: 10pt; font-weight: 700; color: #1e40af; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #ddd; padding-bottom: 3px; margin-bottom: 6px; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; }
+    .field { font-size: 10pt; }
+    .field b { color: #333; }
+    .content { font-size: 10.5pt; white-space: pre-wrap; background: #f8f9fa; padding: 8px 10px; border-radius: 4px; border: 1px solid #e5e7eb; min-height: 30px; }
+    .signature-area { margin-top: 30px; text-align: center; border-top: 1px solid #ddd; padding-top: 16px; }
+    .signature-area img { max-height: 70px; margin-bottom: 4px; }
+    .signature-area .name { font-size: 11pt; font-weight: 700; }
+    .signature-area .info { font-size: 9pt; color: #555; }
+    .footer { margin-top: 20px; text-align: center; font-size: 8pt; color: #999; border-top: 1px solid #eee; padding-top: 8px; }
+    @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+  `;
+
+  function signatureHTML(doc: { assinatura: string; nome: string; cbo: string; cns: string; dataAtend: string; horaFim: string }) {
+    return `<div class="signature-area">
+      ${doc.assinatura ? `<img src="${doc.assinatura}" alt="Assinatura do Profissional">` : '<div style="height:50px;border-bottom:1px solid #333;width:250px;margin:0 auto;"></div>'}
+      <div class="name">Dr(a). ${doc.nome}</div>
+      <div class="info">${doc.cbo ? 'CBO: ' + doc.cbo : ''}${doc.cns ? ' | CNS: ' + doc.cns : ''}</div>
+      <div class="info">Data: ${doc.dataAtend} ${doc.horaFim ? '| ' + doc.horaFim : ''}</div>
+    </div>`;
+  }
+
   // Generate PDF of the prontuario
   async function gerarPDFProntuario(atend: Atendimento) {
-    // Fetch doctor signature + info via RPC (SECURITY DEFINER bypasses RLS)
-    let assinaturaBase64 = atend.assinatura_medico || '';
-    let nomeProf = user?.nome_completo || 'Medico';
-    let cboProf = '';
-    let cnsProf = '';
-
-    const profId = atend.profissional_id || user?.id;
-    if (profId) {
-      const { data: profData } = await supabase.rpc('get_assinatura_profissional', {
-        p_profissional_id: profId,
-      });
-      if (profData && profData.length > 0) {
-        if (!assinaturaBase64 && profData[0].assinatura_digital) {
-          assinaturaBase64 = profData[0].assinatura_digital;
-        }
-        nomeProf = profData[0].nome_completo || nomeProf;
-        cboProf = profData[0].cbo || '';
-        cnsProf = profData[0].cns || '';
-      }
+    const doc = getDoctorInfo(atend);
+    // If profissional relation didn't have assinatura, try RPC as fallback
+    if (!doc.assinatura) {
+      try {
+        const { data: rpcData } = await supabase.rpc('get_assinatura_profissional', {
+          p_profissional_id: atend.profissional_id || user?.id,
+        });
+        if (rpcData?.[0]?.assinatura_digital) doc.assinatura = rpcData[0].assinatura_digital;
+        if (rpcData?.[0]?.nome_completo) doc.nome = rpcData[0].nome_completo;
+        if (rpcData?.[0]?.cbo) doc.cbo = rpcData[0].cbo;
+        if (rpcData?.[0]?.cns) doc.cns = rpcData[0].cns;
+      } catch { /* ignore */ }
     }
+
     const unidadeNome = (selectedUnidade as any)?.municipio?.nome || '';
     const cnesUnidade = (selectedUnidade as any)?.cnes || '';
     const pacNome = atend.paciente?.nome_completo || '';
@@ -320,26 +358,7 @@ export default function ConsultorioPage() {
     if (!printWindow) { toast.error('Bloqueio de popup. Habilite popups para gerar PDF.'); return; }
 
     printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Prontuario - ${pacNome}</title>
-    <style>
-      @page { size: A4; margin: 20mm; }
-      * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
-      body { padding: 0; color: #1a1a1a; font-size: 11pt; line-height: 1.5; }
-      .header { text-align: center; border-bottom: 3px solid #1e40af; padding-bottom: 12px; margin-bottom: 16px; }
-      .header h1 { font-size: 16pt; color: #1e40af; margin-bottom: 2px; }
-      .header p { font-size: 9pt; color: #555; }
-      .section { margin-bottom: 14px; }
-      .section-title { font-size: 10pt; font-weight: 700; color: #1e40af; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #ddd; padding-bottom: 3px; margin-bottom: 6px; }
-      .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; }
-      .field { font-size: 10pt; }
-      .field b { color: #333; }
-      .content { font-size: 10.5pt; white-space: pre-wrap; background: #f8f9fa; padding: 8px 10px; border-radius: 4px; border: 1px solid #e5e7eb; min-height: 30px; }
-      .signature-area { margin-top: 30px; text-align: center; border-top: 1px solid #ddd; padding-top: 16px; }
-      .signature-area img { max-height: 70px; margin-bottom: 4px; }
-      .signature-area .name { font-size: 11pt; font-weight: 700; }
-      .signature-area .info { font-size: 9pt; color: #555; }
-      .footer { margin-top: 20px; text-align: center; font-size: 8pt; color: #999; border-top: 1px solid #eee; padding-top: 8px; }
-      @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
-    </style></head><body>
+    <style>${printStyles}</style></head><body>
     <div class="header">
       <h1>Inovamed - Sistema de Escleroterapia</h1>
       <p>${unidadeNome}${cnesUnidade ? ' | CNES: ' + cnesUnidade : ''}</p>
@@ -362,7 +381,7 @@ export default function ConsultorioPage() {
         <div class="field"><b>Data:</b> ${dataAtend}</div>
         <div class="field"><b>Horario:</b> ${horaInicio}${horaFim ? ' - ' + horaFim : ''}</div>
         <div class="field"><b>Procedimento:</b> ${atend.procedimento?.tipo === 'bilateral' ? 'Bilateral' : 'Unilateral'}</div>
-        <div class="field"><b>Profissional:</b> Dr(a). ${nomeProf}</div>
+        <div class="field"><b>Profissional:</b> Dr(a). ${doc.nome}</div>
       </div>
     </div>
 
@@ -371,15 +390,56 @@ export default function ConsultorioPage() {
     ${(atend.descricao_procedimento || prontuario.descricao_procedimento) ? `<div class="section"><div class="section-title">Descricao do Procedimento</div><div class="content">${atend.descricao_procedimento || prontuario.descricao_procedimento}</div></div>` : ''}
     ${(atend.observacoes || prontuario.observacoes) ? `<div class="section"><div class="section-title">Observacoes</div><div class="content">${atend.observacoes || prontuario.observacoes}</div></div>` : ''}
 
-    <div class="signature-area">
-      ${assinaturaBase64 ? `<img src="${assinaturaBase64}" alt="Assinatura">` : '<div style="height:50px;border-bottom:1px solid #333;width:250px;margin:0 auto;"></div>'}
-      <div class="name">Dr(a). ${nomeProf}</div>
-      <div class="info">${cboProf ? 'CBO: ' + cboProf : ''}${cnsProf ? ' | CNS: ' + cnsProf : ''}</div>
-      <div class="info">Data: ${dataAtend} ${horaFim ? '| Finalizado as ' + horaFim : ''}</div>
-    </div>
+    ${signatureHTML({ ...doc, dataAtend, horaFim })}
 
     <div class="footer">
       Documento gerado pelo sistema Inovamed em ${new Date().toLocaleString('pt-BR')} | Este documento e parte do prontuario eletronico do paciente.
+    </div>
+    </body></html>`);
+    printWindow.document.close();
+    setTimeout(() => printWindow.print(), 500);
+  }
+
+  // Generate Receita (Prescription) PDF
+  function gerarReceitaPDF(atend: Atendimento, receitaTexto?: string) {
+    const doc = getDoctorInfo(atend);
+    const unidadeNome = (selectedUnidade as any)?.municipio?.nome || '';
+    const cnesUnidade = (selectedUnidade as any)?.cnes || '';
+    const pacNome = atend.paciente?.nome_completo || '';
+    const dataAtend = formatDate(atend.data_atendimento, 'dd/MM/yyyy');
+    const texto = receitaTexto || atend.receita || prontuario.receita || '';
+
+    if (!texto.trim()) {
+      toast.error('Preencha o campo Receita antes de gerar.');
+      return;
+    }
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) { toast.error('Bloqueio de popup. Habilite popups para gerar receita.'); return; }
+
+    printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Receita - ${pacNome}</title>
+    <style>${printStyles}
+      .receita-body { min-height: 400px; font-size: 12pt; line-height: 1.8; white-space: pre-wrap; padding: 16px 0; }
+    </style></head><body>
+    <div class="header">
+      <h1>Inovamed - Sistema de Escleroterapia</h1>
+      <p>${unidadeNome}${cnesUnidade ? ' | CNES: ' + cnesUnidade : ''}</p>
+      <p style="font-size:12pt;font-weight:700;margin-top:8px;color:#1e40af;">RECEITUARIO</p>
+    </div>
+
+    <div class="section">
+      <div class="grid2">
+        <div class="field"><b>Paciente:</b> ${pacNome}</div>
+        <div class="field"><b>Data:</b> ${dataAtend}</div>
+      </div>
+    </div>
+
+    <div class="receita-body">${texto}</div>
+
+    ${signatureHTML({ ...doc, dataAtend, horaFim: '' })}
+
+    <div class="footer">
+      Documento gerado pelo sistema Inovamed em ${new Date().toLocaleString('pt-BR')}
     </div>
     </body></html>`);
     printWindow.document.close();
@@ -527,6 +587,14 @@ export default function ConsultorioPage() {
                               >
                                 PDF
                               </button>
+                              {atend.receita && (
+                                <button
+                                  onClick={() => gerarReceitaPDF(atend)}
+                                  className="text-[11px] font-semibold text-pink-700 bg-pink-50 px-2.5 py-1.5 rounded-md hover:bg-pink-100 transition-colors"
+                                >
+                                  Receita
+                                </button>
+                              )}
                               <button
                                 onClick={() => reabrirAtendimento(atend)}
                                 className="text-[11px] font-semibold text-amber-700 bg-amber-50 px-2.5 py-1.5 rounded-md hover:bg-amber-100 transition-colors"
@@ -742,6 +810,7 @@ export default function ConsultorioPage() {
                     { key: 'anamnese', label: 'Anamnese', color: 'bg-amber-500', placeholder: 'Historia clinica, queixas, sintomas...', rows: 3 },
                     { key: 'descricao_procedimento', label: 'Descricao do Procedimento', color: 'bg-emerald-500', placeholder: 'Descreva o procedimento realizado...', rows: 4, templates: true },
                     { key: 'observacoes', label: 'Observacoes', color: '', placeholder: 'Observacoes adicionais...', rows: 2 },
+                    { key: 'receita', label: 'Receita', color: 'bg-pink-500', placeholder: 'Prescricao medica...\nEx: Meia elastica 20-30 mmHg - usar por 7 dias\nAntiinflamatorio - se necessario', rows: 4 },
                   ].map((field) => (
                     <div key={field.key}>
                       <label className="input-label flex items-center gap-2">
@@ -773,7 +842,7 @@ export default function ConsultorioPage() {
                   ))}
                 </div>
                 <div className="px-5 py-4 border-t border-surface-100 flex justify-between gap-2">
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     <button onClick={() => salvarProntuario(false)} disabled={saving} className="btn-secondary text-sm">
                       Salvar Rascunho
                     </button>
@@ -782,6 +851,12 @@ export default function ConsultorioPage() {
                       className="text-sm font-medium text-purple-700 bg-purple-50 border border-purple-200 px-3 py-2 rounded-lg hover:bg-purple-100 transition-colors"
                     >
                       Gerar PDF
+                    </button>
+                    <button
+                      onClick={() => gerarReceitaPDF(atendimentoAtual)}
+                      className="text-sm font-medium text-pink-700 bg-pink-50 border border-pink-200 px-3 py-2 rounded-lg hover:bg-pink-100 transition-colors"
+                    >
+                      Gerar Receita
                     </button>
                   </div>
                   <button onClick={() => salvarProntuario(true)} disabled={saving} className="btn-success text-sm">

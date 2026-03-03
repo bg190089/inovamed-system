@@ -108,6 +108,7 @@ export interface Atendimento {
   reabertura_count?: number;
   ultima_reabertura?: string;
   assinatura_medico?: string;
+  receita?: string;
   created_at: string;
   // Relations
   paciente?: Paciente;
