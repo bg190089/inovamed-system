@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSupabase } from '@/hooks/useSupabase';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
-import { PacienteService, AgendamentoService } from '@/lib/services';
+import { PacienteService, AgendamentoService, AtendimentoService } from '@/lib/services';
 import { toast } from 'sonner';
 import { maskCPF, formatDate, calcularIdade, cn } from '@/lib/utils';
 import { ConfirmDialog, EmptyState, PageHeader } from '@/components/ui';
@@ -15,6 +15,7 @@ export default function AgendamentoPage() {
   const supabase = useSupabase();
   const pacienteService = useMemo(() => new PacienteService(supabase), [supabase]);
   const agendamentoService = useMemo(() => new AgendamentoService(supabase), [supabase]);
+  const atendimentoService = useMemo(() => new AtendimentoService(supabase), [supabase]);
   const { state: confirmState, confirm, close: closeConfirm } = useConfirmDialog();
 
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -31,6 +32,7 @@ export default function AgendamentoPage() {
   const [loading, setLoading] = useState(false);
   const [selectedProfissionalFilter, setSelectedProfissionalFilter] = useState<string>('');
   const [prefilledRetorno, setPrefilledRetorno] = useState<Agendamento | null>(null);
+  const [sessoesPaciente, setSessoesPaciente] = useState<number>(0);
 
   const [form, setForm] = useState({
     data_agendamento: new Date().toISOString().split('T')[0],
@@ -43,8 +45,14 @@ export default function AgendamentoPage() {
   });
 
   // Helpers
-  const isRetorno = (obs?: string | null) => obs?.startsWith('[RETORNO]');
-  const getTipoLabel = (obs?: string | null) => isRetorno(obs) ? 'Retorno' : '1ª Consulta';
+  const isRetorno = (obs?: string | null) => obs?.startsWith('[RETORNO]') || obs?.startsWith('[SESSAO');
+  const getSessaoLabel = (obs?: string | null, numSessao?: number | null) => {
+    if (numSessao) return `Sessao ${numSessao}`;
+    const match = obs?.match(/\[SESSAO (\d+)\]/);
+    if (match) return `Sessao ${match[1]}`;
+    if (obs?.startsWith('[RETORNO]')) return 'Retorno';
+    return '1a Sessao';
+  };
 
   const getWeekDays = useCallback((date: string) => {
     const d = new Date(date);
@@ -144,11 +152,16 @@ export default function AgendamentoPage() {
     return () => clearTimeout(t);
   }, [searchTerm, pacienteService]);
 
-  function selectPaciente(pac: Paciente) {
+  async function selectPaciente(pac: Paciente) {
     setSelectedPaciente(pac);
     loadPacienteHistory(pac.id);
     setSearchResults([]);
     setSearchTerm('');
+    // Load session count
+    try {
+      const count = await atendimentoService.contarSessoes12Meses(pac.id);
+      setSessoesPaciente(count);
+    } catch { setSessoesPaciente(0); }
   }
 
   async function handleCreateAgendamento() {
@@ -171,8 +184,8 @@ export default function AgendamentoPage() {
 
     setLoading(true);
     try {
-      const obsPrefix = form.tipo_consulta === 'retorno' ? '[RETORNO] ' : '[1a CONSULTA] ';
-      const fullObs = obsPrefix + (form.observacoes || '');
+      const sessaoLabel = sessoesPaciente > 0 ? `[SESSAO ${sessoesPaciente + 1}] ` : '[SESSAO 1] ';
+      const fullObs = sessaoLabel + (form.observacoes || '');
 
       await agendamentoService.createAgendamento({
         empresa_id: selectedEmpresa.id,
@@ -184,6 +197,7 @@ export default function AgendamentoPage() {
         hora_inicio: form.hora_inicio,
         hora_fim: form.hora_fim || null,
         observacoes: fullObs,
+        numero_sessao: sessoesPaciente + 1,
         status: 'agendado',
       });
 
@@ -204,6 +218,7 @@ export default function AgendamentoPage() {
     setSearchResults([]);
     setPacienteHistory([]);
     setPrefilledRetorno(null);
+    setSessoesPaciente(0);
     setForm({
       data_agendamento: new Date().toISOString().split('T')[0],
       hora_inicio: '09:00',
@@ -215,9 +230,17 @@ export default function AgendamentoPage() {
     });
   }
 
-  function openRetornoModal(agendamento: Agendamento) {
+  async function openRetornoModal(agendamento: Agendamento) {
     setPrefilledRetorno(agendamento);
     setSelectedPaciente(agendamento.paciente || null);
+
+    // Load session count
+    if (agendamento.paciente_id) {
+      try {
+        const count = await atendimentoService.contarSessoes12Meses(agendamento.paciente_id);
+        setSessoesPaciente(count);
+      } catch { setSessoesPaciente(0); }
+    }
 
     const novaData = new Date(agendamento.data_agendamento);
     novaData.setDate(novaData.getDate() + 30);
@@ -484,7 +507,7 @@ export default function AgendamentoPage() {
                           'badge text-xs',
                           isRetorno(agendamento.observacoes) ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700'
                         )}>
-                          {getTipoLabel(agendamento.observacoes)}
+                          {getSessaoLabel(agendamento.observacoes, agendamento.numero_sessao)}
                         </span>
                       </td>
                       <td className="px-4 py-3">
@@ -593,7 +616,7 @@ export default function AgendamentoPage() {
                       'badge text-xs',
                       isRetorno(agendamento.observacoes) ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700'
                     )}>
-                      {getTipoLabel(agendamento.observacoes)}
+                      {getSessaoLabel(agendamento.observacoes, agendamento.numero_sessao)}
                     </span>
                     <span className={cn('badge text-xs', agendamento.procedimento?.tipo === 'bilateral' ? 'bg-purple-100 text-purple-700' : 'bg-sky-100 text-sky-700')}>
                       {agendamento.procedimento?.tipo === 'bilateral' ? 'Bilateral' : 'Unilateral'}
@@ -673,7 +696,7 @@ export default function AgendamentoPage() {
           <div className="bg-white rounded-2xl shadow-elevated w-full max-w-2xl mb-8">
             <div className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-surface-100 sticky top-0 bg-white rounded-t-2xl z-10">
               <h2 className="text-lg font-display font-bold text-surface-900">
-                {prefilledRetorno ? 'Agendar Retorno' : 'Novo Agendamento'}
+                {prefilledRetorno ? 'Proxima Sessao' : 'Novo Agendamento'}
               </h2>
               <button onClick={resetAndClose} className="p-2 rounded-lg hover:bg-surface-100">
                 <svg className="w-5 h-5 text-surface-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -758,34 +781,24 @@ export default function AgendamentoPage() {
                   <div className="border-t border-surface-100 pt-4 space-y-4">
                     <h3 className="font-semibold text-surface-800">Dados do Agendamento</h3>
 
-                    {/* Consultation Type */}
+                    {/* Session Info */}
                     <div>
-                      <label className="input-label">Tipo de Consulta <span className="text-red-500">*</span></label>
-                      <div className="flex gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setForm({ ...form, tipo_consulta: 'primeira' })}
-                          className={cn(
-                            'flex-1 p-3 rounded-xl border-2 text-sm font-medium transition-all',
-                            form.tipo_consulta === 'primeira'
-                              ? 'border-brand-500 bg-brand-50 text-brand-700'
-                              : 'border-surface-200 text-surface-500 hover:border-surface-300'
-                          )}
-                        >
-                          1ª Consulta
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setForm({ ...form, tipo_consulta: 'retorno' })}
-                          className={cn(
-                            'flex-1 p-3 rounded-xl border-2 text-sm font-medium transition-all',
-                            form.tipo_consulta === 'retorno'
-                              ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                              : 'border-surface-200 text-surface-500 hover:border-surface-300'
-                          )}
-                        >
-                          Retorno
-                        </button>
+                      <label className="input-label">Sessao</label>
+                      <div className={cn(
+                        'p-3 rounded-xl border-2 text-sm font-medium',
+                        sessoesPaciente >= 3 ? 'border-red-300 bg-red-50 text-red-700' : 'border-blue-300 bg-blue-50 text-blue-700'
+                      )}>
+                        {selectedPaciente ? (
+                          <div className="flex items-center justify-between">
+                            <span>Proxima: Sessao {sessoesPaciente + 1}</span>
+                            <span className="text-xs opacity-75">{sessoesPaciente} sessao(es) nos ultimos 12 meses</span>
+                          </div>
+                        ) : (
+                          <span className="text-surface-400">Selecione um paciente</span>
+                        )}
+                        {sessoesPaciente >= 3 && (
+                          <p className="text-xs mt-1 text-red-600 font-bold">ATENCAO: Paciente atingira 4+ sessoes em 12 meses!</p>
+                        )}
                       </div>
                     </div>
 
@@ -872,7 +885,7 @@ export default function AgendamentoPage() {
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
-                      {prefilledRetorno ? 'Agendar Retorno' : 'Criar Agendamento'}
+                      {prefilledRetorno ? 'Agendar Proxima Sessao' : 'Criar Agendamento'}
                     </>
                   )}
                 </button>

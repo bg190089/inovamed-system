@@ -46,6 +46,8 @@ export interface Profissional {
   role: UserRole;
   empresa_id?: string;
   ativo: boolean;
+  assinatura_digital?: string;
+  tipo_assinatura?: string;
   empresa?: Empresa;
   unidades?: Unidade[];
 }
@@ -103,6 +105,9 @@ export interface Atendimento {
   assinatura_paciente?: string;
   assinatura_at?: string;
   termo_aceito: boolean;
+  reabertura_count?: number;
+  ultima_reabertura?: string;
+  assinatura_medico?: string;
   created_at: string;
   // Relations
   paciente?: Paciente;
@@ -133,6 +138,7 @@ export interface Agendamento {
   hora_inicio: string;
   hora_fim?: string;
   observacoes?: string;
+  numero_sessao?: number;
   status: AgendamentoStatus;
   created_at: string;
   updated_at?: string;

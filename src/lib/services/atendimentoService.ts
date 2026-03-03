@@ -54,4 +54,43 @@ export class AtendimentoService {
     const { data } = await this.supabase.from('profissionais').select('*').eq('role', 'medico').eq('ativo', true);
     return data || [];
   }
+
+  async getFinalizadosPorData(unidadeId: string, profissionalId: string, data: string): Promise<Atendimento[]> {
+    const { data: records, error } = await this.supabase
+      .from('atendimentos')
+      .select(FULL_SELECT)
+      .eq('unidade_id', unidadeId)
+      .eq('profissional_id', profissionalId)
+      .eq('data_atendimento', data)
+      .eq('status', 'finalizado')
+      .order('hora_fim_atendimento', { ascending: false });
+    if (error) throw new Error(error.message);
+    return records || [];
+  }
+
+  async reabrirAtendimento(id: string): Promise<void> {
+    const { error } = await this.supabase
+      .from('atendimentos')
+      .update({
+        status: 'em_atendimento',
+        hora_fim_atendimento: null,
+        reabertura_count: this.supabase.rpc ? undefined : 0,
+        ultima_reabertura: new Date().toISOString(),
+      })
+      .eq('id', id);
+    if (error) throw new Error(error.message);
+    // Increment reabertura_count via raw update
+    await this.supabase.rpc('incrementar_reabertura', { p_atendimento_id: id }).catch(() => {
+      // Fallback: direct update if RPC doesn't exist
+      this.supabase.from('atendimentos').update({
+        ultima_reabertura: new Date().toISOString()
+      }).eq('id', id);
+    });
+  }
+
+  async contarSessoes12Meses(pacienteId: string): Promise<number> {
+    const { data, error } = await this.supabase.rpc('contar_sessoes_12_meses', { p_paciente_id: pacienteId });
+    if (error) return 0;
+    return data || 0;
+  }
 }

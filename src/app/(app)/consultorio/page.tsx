@@ -43,6 +43,10 @@ export default function ConsultorioPage() {
   // Queue data
   const [filaDoMedico, setFilaDoMedico] = useState<Atendimento[]>([]);
   const [filaUnidade, setFilaUnidade] = useState<Atendimento[]>([]);
+  const [finalizados, setFinalizados] = useState<Atendimento[]>([]);
+  const [showFinalizados, setShowFinalizados] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [sessoesPaciente, setSessoesPaciente] = useState<number>(0);
 
   // Atendimento state
   const [atendimentoAtual, setAtendimentoAtual] = useState<Atendimento | null>(null);
@@ -82,6 +86,21 @@ export default function ConsultorioPage() {
       console.error(err);
     }
   }, [selectedUnidade, service]);
+
+  // Load finalized atendimentos for selected date
+  const loadFinalizados = useCallback(async () => {
+    if (!user || !selectedUnidade) return;
+    try {
+      const data = await service.getFinalizadosPorData(selectedUnidade.id, user.id, selectedDate);
+      setFinalizados(data);
+    } catch (err) {
+      console.error(err);
+    }
+  }, [user, selectedUnidade, service, selectedDate]);
+
+  useEffect(() => {
+    if (showFinalizados) loadFinalizados();
+  }, [showFinalizados, selectedDate, loadFinalizados]);
 
   // Setup real-time subscription and polling
   useEffect(() => {
@@ -143,7 +162,43 @@ export default function ConsultorioPage() {
     });
     const hist = await service.getHistoricoPaciente(atend.paciente_id);
     setHistorico(hist);
+    // Load session count
+    const sessoes = await service.contarSessoes12Meses(atend.paciente_id);
+    setSessoesPaciente(sessoes);
     loadFilaMedico();
+  }
+
+  async function reabrirAtendimento(atend: Atendimento) {
+    confirm({
+      title: 'Reabrir Prontuario',
+      description: `Deseja reabrir o prontuario de ${atend.paciente?.nome_completo}? Voce podera editar e finalizar novamente.`,
+      variant: 'default',
+      confirmLabel: 'Reabrir',
+      onConfirm: async () => {
+        try {
+          await service.reabrirAtendimento(atend.id);
+          toast.success('Prontuario reaberto para edicao');
+          setAtendimentoAtual({ ...atend, status: 'em_atendimento' as any });
+          setProntuario({
+            doppler: atend.doppler || '',
+            anamnese: atend.anamnese || '',
+            descricao_procedimento: atend.descricao_procedimento || '',
+            observacoes: atend.observacoes || '',
+          });
+          const hist = await service.getHistoricoPaciente(atend.paciente_id);
+          setHistorico(hist);
+          const sessoes = await service.contarSessoes12Meses(atend.paciente_id);
+          setSessoesPaciente(sessoes);
+          setShowFinalizados(false);
+          loadFilaMedico();
+          loadFilaUnidade();
+          loadFinalizados();
+        } catch (err: any) {
+          toast.error(err.message || 'Erro ao reabrir');
+        }
+        closeConfirm();
+      },
+    });
   }
 
   async function salvarProntuario(finalizar = false) {
@@ -247,47 +302,122 @@ export default function ConsultorioPage() {
         {/* Left: Queue */}
         <div className="lg:col-span-1">
           <div className="card sticky top-6">
-            <div className="px-4 py-3 border-b border-surface-100 flex items-center justify-between">
-              <h2 className="font-display font-semibold text-surface-800 text-sm">Minha Fila ({filaDoMedico.length})</h2>
+            {/* Tab Toggle: Fila / Finalizados */}
+            <div className="px-4 py-2 border-b border-surface-100 flex items-center gap-1">
+              <button
+                onClick={() => setShowFinalizados(false)}
+                className={cn(
+                  'px-3 py-1.5 text-xs font-semibold rounded-md transition-colors',
+                  !showFinalizados ? 'bg-brand-500 text-white' : 'text-surface-600 hover:bg-surface-100'
+                )}
+              >
+                Fila ({filaDoMedico.length})
+              </button>
+              <button
+                onClick={() => setShowFinalizados(true)}
+                className={cn(
+                  'px-3 py-1.5 text-xs font-semibold rounded-md transition-colors',
+                  showFinalizados ? 'bg-emerald-500 text-white' : 'text-surface-600 hover:bg-surface-100'
+                )}
+              >
+                Finalizados ({showFinalizados ? finalizados.length : stats.finalizados})
+              </button>
             </div>
-            {filaDoMedico.length === 0 ? (
-              <div className="p-8 text-center">
-                <p className="text-surface-400 text-sm">Nenhum paciente aguardando</p>
+
+            {/* Date picker for finalizados */}
+            {showFinalizados && (
+              <div className="px-4 py-2 border-b border-surface-100 bg-surface-50/50">
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="input-field text-xs py-1.5"
+                />
               </div>
-            ) : (
-              <div className="divide-y divide-surface-50">
-                {filaDoMedico.map((atend, idx) => {
-                  const agePriority = getAgePriority(atend.paciente?.data_nascimento || null);
-                  return (
-                    <button
-                      key={atend.id}
-                      onClick={() => iniciarAtendimento(atend)}
-                      className={cn(
-                        'w-full text-left px-4 py-3 hover:bg-surface-50 transition-colors',
-                        atendimentoAtual?.id === atend.id && 'bg-brand-50 border-l-4 border-brand-500'
-                      )}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <span className="text-xs font-semibold text-surface-400 flex-shrink-0">#{idx + 1}</span>
-                          <p className="text-sm font-medium text-surface-800 truncate">{atend.paciente?.nome_completo}</p>
+            )}
+
+            {/* Active queue */}
+            {!showFinalizados && (
+              <>
+                {filaDoMedico.length === 0 ? (
+                  <div className="p-8 text-center">
+                    <p className="text-surface-400 text-sm">Nenhum paciente aguardando</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-surface-50">
+                    {filaDoMedico.map((atend, idx) => {
+                      const agePriority = getAgePriority(atend.paciente?.data_nascimento || null);
+                      return (
+                        <button
+                          key={atend.id}
+                          onClick={() => iniciarAtendimento(atend)}
+                          className={cn(
+                            'w-full text-left px-4 py-3 hover:bg-surface-50 transition-colors',
+                            atendimentoAtual?.id === atend.id && 'bg-brand-50 border-l-4 border-brand-500'
+                          )}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              <span className="text-xs font-semibold text-surface-400 flex-shrink-0">#{idx + 1}</span>
+                              <p className="text-sm font-medium text-surface-800 truncate">{atend.paciente?.nome_completo}</p>
+                            </div>
+                            <span className={`badge text-[10px] flex-shrink-0 ${getStatusColor(atend.status)}`}>
+                              {getStatusLabel(atend.status)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between mt-1">
+                            <div className="flex items-center gap-1 text-xs text-surface-500">
+                              <span className={agePriority.color}>{agePriority.age}a {agePriority.badge}</span>
+                              {agePriority.label && <span className={`text-[10px] font-semibold ${agePriority.color}`}>{agePriority.label}</span>}
+                              <span>•</span>
+                              <span>{calcWaitTime(atend.hora_chegada)}</span>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Finalized list */}
+            {showFinalizados && (
+              <>
+                {finalizados.length === 0 ? (
+                  <div className="p-8 text-center">
+                    <p className="text-surface-400 text-sm">Nenhum atendimento finalizado nesta data</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-surface-50">
+                    {finalizados.map((atend) => {
+                      const agePriority = getAgePriority(atend.paciente?.data_nascimento || null);
+                      return (
+                        <div
+                          key={atend.id}
+                          className="px-4 py-3 hover:bg-surface-50 transition-colors"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-surface-800 truncate">{atend.paciente?.nome_completo}</p>
+                              <p className="text-xs text-surface-500 mt-0.5">
+                                {agePriority.age}a • {atend.procedimento?.tipo === 'bilateral' ? 'Bilateral' : 'Unilateral'}
+                                {atend.reabertura_count ? ` • Reaberto ${atend.reabertura_count}x` : ''}
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => reabrirAtendimento(atend)}
+                              className="text-[11px] font-semibold text-amber-700 bg-amber-50 px-2.5 py-1.5 rounded-md hover:bg-amber-100 transition-colors flex-shrink-0"
+                            >
+                              Reabrir
+                            </button>
+                          </div>
                         </div>
-                        <span className={`badge text-[10px] flex-shrink-0 ${getStatusColor(atend.status)}`}>
-                          {getStatusLabel(atend.status)}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between mt-1">
-                        <div className="flex items-center gap-1 text-xs text-surface-500">
-                          <span className={agePriority.color}>{agePriority.age}a {agePriority.badge}</span>
-                          {agePriority.label && <span className={`text-[10px] font-semibold ${agePriority.color}`}>{agePriority.label}</span>}
-                          <span>•</span>
-                          <span>{calcWaitTime(atend.hora_chegada)}</span>
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -304,12 +434,33 @@ export default function ConsultorioPage() {
             </div>
           ) : (
             <div className="space-y-4">
+              {/* Session Alert */}
+              {sessoesPaciente >= 4 && (
+                <div className="card p-3 bg-red-50 border border-red-200">
+                  <div className="flex items-center gap-2">
+                    <span className="text-red-600 text-lg">⚠️</span>
+                    <div>
+                      <p className="text-sm font-bold text-red-700">ALERTA: {sessoesPaciente}a sessao em menos de 12 meses</p>
+                      <p className="text-xs text-red-600">Paciente atingiu o limite de sessoes. Verificar necessidade clinica.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Patient Header */}
               <div className="card p-4">
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex-1">
                     <h3 className="font-display font-bold text-surface-900 text-lg">
                       {atendimentoAtual.paciente?.nome_completo}
+                      {sessoesPaciente > 0 && (
+                        <span className={cn(
+                          'ml-2 text-xs font-semibold px-2 py-0.5 rounded-full',
+                          sessoesPaciente >= 4 ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
+                        )}>
+                          Sessao {sessoesPaciente}
+                        </span>
+                      )}
                     </h3>
                     <p className="text-sm text-surface-500 mt-0.5">
                       {calcularIdade(atendimentoAtual.paciente?.data_nascimento || '')} anos •{' '}
