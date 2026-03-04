@@ -194,6 +194,100 @@ export default function PacientesPage() {
     };
   }, [supabase]);
 
+  // Imprimir atendimento individual
+  function handlePrintAtendimento(atend: any) {
+    const pac = selectedPaciente;
+    if (!pac) return;
+
+    const dataFormatted = formatDate(atend.data_atendimento, 'dd/MM/yyyy');
+    const medicoNome = atend.profissional?.nome_completo || '—';
+    const medicoCRM = atend.profissional?.crm || '';
+    const unidadeNome = (atend.unidade as any)?.nome || '—';
+    const municipioNome = (atend.unidade as any)?.municipio?.nome || '—';
+    const procedTipo = atend.procedimento?.tipo === 'bilateral' ? 'Bilateral' : 'Unilateral';
+
+    const printContent = `
+      <!DOCTYPE html>
+      <html><head><meta charset="UTF-8">
+      <title>Atendimento - ${pac.nome_completo} - ${dataFormatted}</title>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; padding: 20px; font-size: 12px; color: #333; }
+        .header { text-align: center; border-bottom: 2px solid #2563eb; padding-bottom: 12px; margin-bottom: 16px; }
+        .header h1 { font-size: 16px; color: #1e40af; margin-bottom: 2px; }
+        .header p { font-size: 11px; color: #64748b; }
+        .section { margin-bottom: 14px; }
+        .section-title { font-size: 11px; font-weight: bold; color: #1e40af; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; margin-bottom: 8px; }
+        .row { display: flex; gap: 16px; margin-bottom: 4px; }
+        .label { color: #64748b; font-size: 10px; font-weight: bold; text-transform: uppercase; }
+        .value { font-size: 12px; }
+        .field { margin-bottom: 10px; }
+        .field-content { white-space: pre-wrap; line-height: 1.5; border: 1px solid #e2e8f0; border-radius: 4px; padding: 8px; background: #f8fafc; min-height: 24px; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; }
+        .badge-bilateral { background: #f3e8ff; color: #7c3aed; }
+        .badge-unilateral { background: #e0f2fe; color: #0284c7; }
+        .footer { margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 12px; }
+        .signature-line { border-top: 1px solid #333; width: 250px; margin-top: 60px; padding-top: 4px; text-align: center; font-size: 11px; }
+        @media print { body { padding: 10px; } }
+      </style></head><body>
+      <div class="header">
+        <h1>INOVAMED - Sistema de Escleroterapia</h1>
+        <p>Registro de Atendimento</p>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Dados do Paciente</div>
+        <div class="row"><span class="label">Nome:</span> <span class="value"><strong>${pac.nome_completo}</strong></span></div>
+        <div class="row">
+          <span><span class="label">CPF:</span> ${maskCPF(pac.cpf || '')}</span>
+          <span><span class="label">CNS:</span> ${pac.cns || '—'}</span>
+          <span><span class="label">Idade:</span> ${calcularIdade(pac.data_nascimento)}a</span>
+          <span><span class="label">Sexo:</span> ${pac.sexo === 'F' ? 'Feminino' : 'Masculino'}</span>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Dados do Atendimento</div>
+        <div class="row">
+          <span><span class="label">Data:</span> <strong>${dataFormatted}</strong></span>
+          <span><span class="label">Tipo:</span> <span class="badge ${atend.procedimento?.tipo === 'bilateral' ? 'badge-bilateral' : 'badge-unilateral'}">${procedTipo}</span></span>
+        </div>
+        <div class="row">
+          <span><span class="label">Unidade:</span> ${unidadeNome} - ${municipioNome}</span>
+        </div>
+        <div class="row">
+          <span><span class="label">Medico:</span> <strong>Dr(a). ${medicoNome}</strong>${medicoCRM ? ` - CRM ${medicoCRM}` : ''}</span>
+        </div>
+      </div>
+
+      ${atend.doppler ? `<div class="section"><div class="section-title">Doppler Vascular</div><div class="field"><div class="field-content">${atend.doppler}</div></div></div>` : ''}
+
+      ${atend.anamnese ? `<div class="section"><div class="section-title">Anamnese</div><div class="field"><div class="field-content">${atend.anamnese}</div></div></div>` : ''}
+
+      ${atend.descricao_procedimento ? `<div class="section"><div class="section-title">Descricao do Procedimento</div><div class="field"><div class="field-content">${atend.descricao_procedimento}</div></div></div>` : ''}
+
+      ${atend.observacoes ? `<div class="section"><div class="section-title">Observacoes</div><div class="field"><div class="field-content">${atend.observacoes}</div></div></div>` : ''}
+
+      <div class="footer">
+        <div class="signature-line">
+          Dr(a). ${medicoNome}<br/>
+          ${medicoCRM ? `CRM: ${medicoCRM}` : ''}
+        </div>
+      </div>
+
+      </body></html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.onload = () => {
+        printWindow.print();
+      };
+    }
+  }
+
   // Merge triagens and atendimentos into timeline
   const timeline = useMemo(() => {
     const items: Array<{ type: 'triagem' | 'atendimento'; date: string; data: any }> = [];
@@ -372,12 +466,22 @@ export default function PacientesPage() {
                               {item.data.procedimento?.tipo === 'bilateral' ? 'Bilateral' : 'Unilateral'}
                             </span>
                           </span>
-                          <span className="text-[10px] text-blue-500">{formatDate(item.data.data_atendimento, 'dd/MM/yyyy')}</span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handlePrintAtendimento(item.data)}
+                              className="text-[10px] font-semibold text-blue-600 bg-blue-100 px-2 py-1 rounded hover:bg-blue-200 transition-colors flex items-center gap-1"
+                              title="Imprimir atendimento"
+                            >
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                              Imprimir
+                            </button>
+                            <span className="text-[10px] text-blue-500">{formatDate(item.data.data_atendimento, 'dd/MM/yyyy')}</span>
+                          </div>
                         </div>
                         <div className="p-4 text-sm space-y-2">
                           <div className="text-xs text-surface-500 flex gap-3">
                             <span>Unidade: {(item.data.unidade as any)?.municipio?.nome || '—'}</span>
-                            <span>Medico: Dr(a). {item.data.profissional?.nome_completo?.split(' ')[0] || '—'}</span>
+                            <span>Medico: Dr(a). {item.data.profissional?.nome_completo || '—'}</span>
                           </div>
                           {item.data.doppler && (
                             <div><p className="text-[10px] text-surface-400 uppercase font-semibold">Doppler</p><p className="text-xs text-surface-700 whitespace-pre-wrap">{item.data.doppler}</p></div>

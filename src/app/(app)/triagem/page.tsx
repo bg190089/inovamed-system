@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSupabase } from '@/hooks/useSupabase';
-import { AtendimentoService, TriagemService, AgendamentoService } from '@/lib/services';
+import { AtendimentoService, TriagemService, AgendamentoService, PacienteService } from '@/lib/services';
 import type { Triagem } from '@/lib/services/triagemService';
 import { toast } from 'sonner';
 import { formatDate, calcularIdade, cn, maskCPF, maskPhone } from '@/lib/utils';
@@ -50,6 +50,7 @@ export default function TriagemPage() {
   const atendimentoService = useMemo(() => new AtendimentoService(supabase), [supabase]);
   const triagemService = useMemo(() => new TriagemService(supabase), [supabase]);
   const agendamentoService = useMemo(() => new AgendamentoService(supabase), [supabase]);
+  const pacienteService = useMemo(() => new PacienteService(supabase), [supabase]);
 
   const [fila, setFila] = useState<Atendimento[]>([]);
   const [selectedAtend, setSelectedAtend] = useState<Atendimento | null>(null);
@@ -60,6 +61,13 @@ export default function TriagemPage() {
   const [saving, setSaving] = useState(false);
   const [medicos, setMedicos] = useState<Profissional[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // Nova triagem avulsa
+  const [showNovaTriagem, setShowNovaTriagem] = useState(false);
+  const [buscaPaciente, setBuscaPaciente] = useState('');
+  const [resultadosBusca, setResultadosBusca] = useState<any[]>([]);
+  const [pacienteAvulso, setPacienteAvulso] = useState<any>(null);
+  const [buscando, setBuscando] = useState(false);
 
   // Load queue of patients waiting for triage
   const loadFila = useCallback(async () => {
@@ -98,6 +106,105 @@ export default function TriagemPage() {
     const interval = setInterval(() => setRefreshKey(k => k + 1), 30000);
     return () => clearInterval(interval);
   }, []);
+
+  // Busca de paciente para triagem avulsa (debounced)
+  useEffect(() => {
+    const t = setTimeout(async () => {
+      if (buscaPaciente.length < 3) { setResultadosBusca([]); return; }
+      setBuscando(true);
+      try {
+        const results = await pacienteService.buscar(buscaPaciente);
+        setResultadosBusca(results);
+      } catch { setResultadosBusca([]); }
+      setBuscando(false);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [buscaPaciente, pacienteService]);
+
+  // Selecionar paciente avulso para triagem
+  async function handleSelectPacienteAvulso(pac: any) {
+    setPacienteAvulso(pac);
+    setResultadosBusca([]);
+    setBuscaPaciente('');
+    setLoading(true);
+    try {
+      const hist = await triagemService.getHistoricoPaciente(pac.id);
+      setHistorico(hist);
+      if (hist.length > 0) {
+        const last = hist[0];
+        setForm({
+          alergia: last.alergia || '',
+          pressao_arterial: '',
+          hgt: '',
+          diabetes: last.diabetes,
+          hipertensao: last.hipertensao,
+          doencas_cardiacas: last.doencas_cardiacas,
+          doencas_hepaticas: last.doencas_hepaticas,
+          doencas_renais: last.doencas_renais,
+          outras_doencas: last.outras_doencas || '',
+          escleroterapia_anterior: last.escleroterapia_anterior,
+          escleroterapia_quando: last.escleroterapia_quando || '',
+          trombose_embolia: last.trombose_embolia,
+          trombose_embolia_detalhe: last.trombose_embolia_detalhe || '',
+          doencas_vasculares: last.doencas_vasculares,
+          doencas_vasculares_detalhe: last.doencas_vasculares_detalhe || '',
+          doppler_venoso: last.doppler_venoso,
+          doppler_venoso_detalhe: last.doppler_venoso_detalhe || '',
+          gravidez_amamentacao: last.gravidez_amamentacao,
+          observacao: last.observacao || '',
+          data_proxima_sessao: '',
+        });
+      } else {
+        setForm(EMPTY_FORM);
+      }
+    } catch (err) { console.error(err); }
+    finally { setLoading(false); }
+  }
+
+  // Salvar triagem avulsa (sem atendimento vinculado)
+  async function handleSalvarTriagemAvulsa() {
+    if (!pacienteAvulso || !selectedUnidade || !user) return;
+    setSaving(true);
+    try {
+      await triagemService.criar({
+        paciente_id: pacienteAvulso.id,
+        unidade_id: selectedUnidade.id,
+        profissional_id: user.id,
+        empresa_id: selectedEmpresa?.id,
+        ...form,
+        data_proxima_sessao: form.data_proxima_sessao || null,
+      });
+
+      // Create agendamento if data_proxima_sessao is set
+      if (form.data_proxima_sessao) {
+        try {
+          await supabase.from('agendamentos').insert({
+            empresa_id: selectedEmpresa?.id,
+            unidade_id: selectedUnidade.id,
+            paciente_id: pacienteAvulso.id,
+            data_agendamento: form.data_proxima_sessao,
+            horario_inicio: '08:00',
+            horario_fim: '09:00',
+            numero_sessao: 1,
+            status: 'agendado',
+            observacoes: '[SESSAO] Agendado via triagem avulsa',
+          });
+          toast.success(`Agendamento criado para ${formatDate(form.data_proxima_sessao)}`);
+        } catch (e: any) {
+          console.error('Erro ao criar agendamento:', e);
+          toast.error('Erro ao criar agendamento: ' + (e?.message || ''));
+        }
+      }
+
+      toast.success(`Triagem avulsa salva para ${pacienteAvulso.nome_completo}`);
+      setPacienteAvulso(null);
+      setShowNovaTriagem(false);
+      setForm(EMPTY_FORM);
+      setHistorico([]);
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao salvar triagem avulsa');
+    } finally { setSaving(false); }
+  }
 
   // When selecting a patient, load their triage history
   async function handleSelectPatient(atend: Atendimento) {
@@ -213,10 +320,170 @@ export default function TriagemPage() {
 
   return (
     <div className="p-4 lg:p-8 max-w-7xl mx-auto pt-16 lg:pt-0">
-      <PageHeader
-        title="Triagem"
-        subtitle={`${(selectedUnidade as any)?.municipio?.nome || '—'} • ${formatDate(new Date(), 'dd/MM/yyyy')} • ${fila.length} pacientes aguardando`}
-      />
+      <div className="flex items-center justify-between mb-6">
+        <PageHeader
+          title="Triagem"
+          subtitle={`${(selectedUnidade as any)?.municipio?.nome || '—'} • ${formatDate(new Date(), 'dd/MM/yyyy')} • ${fila.length} pacientes aguardando`}
+        />
+        <button
+          onClick={() => { setShowNovaTriagem(!showNovaTriagem); setSelectedAtend(null); setPacienteAvulso(null); setForm(EMPTY_FORM); setHistorico([]); }}
+          className="px-4 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors flex items-center gap-2"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+          Nova Triagem
+        </button>
+      </div>
+
+      {/* Painel Nova Triagem Avulsa */}
+      {showNovaTriagem && !pacienteAvulso && (
+        <div className="card p-4 mb-6 border-2 border-emerald-200 bg-emerald-50/50">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-bold text-emerald-800">Nova Triagem Avulsa</h3>
+            <button onClick={() => setShowNovaTriagem(false)} className="text-xs text-surface-400 hover:text-surface-600">Fechar</button>
+          </div>
+          <div className="relative">
+            <input
+              type="text"
+              value={buscaPaciente}
+              onChange={(e) => setBuscaPaciente(e.target.value)}
+              className="w-full px-3 py-2 pl-9 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400"
+              placeholder="Buscar paciente por nome, CPF ou CNS..."
+              autoFocus
+            />
+            <svg className="w-4 h-4 text-surface-400 absolute left-3 top-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+            {buscando && <div className="absolute right-3 top-2.5"><div className="w-4 h-4 border-2 border-emerald-300 border-t-emerald-600 rounded-full animate-spin" /></div>}
+          </div>
+          {resultadosBusca.length > 0 && (
+            <div className="mt-2 border border-surface-200 rounded-lg overflow-hidden max-h-48 overflow-y-auto bg-white">
+              {resultadosBusca.map((pac: any) => (
+                <button key={pac.id} onClick={() => handleSelectPacienteAvulso(pac)}
+                  className="w-full text-left px-4 py-2.5 hover:bg-emerald-50 transition-colors border-b border-surface-50 last:border-0">
+                  <p className="text-sm font-medium text-surface-800">{pac.nome_completo}</p>
+                  <p className="text-xs text-surface-400">
+                    CPF: {maskCPF(pac.cpf || '')} | {pac.data_nascimento ? calcularIdade(pac.data_nascimento) + 'a' : ''} | {pac.sexo === 'F' ? 'Fem' : 'Masc'}
+                  </p>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TRIAGEM AVULSA - Formulário completo quando paciente selecionado */}
+      {showNovaTriagem && pacienteAvulso && (
+        <div className="bg-white rounded-xl border-2 border-emerald-200 overflow-hidden mb-6">
+          {/* Patient Header */}
+          <div className="px-6 py-4 bg-gradient-to-r from-emerald-50 to-white border-b border-surface-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[10px] font-bold uppercase">Triagem Avulsa</span>
+                </div>
+                <h2 className="text-lg font-bold text-surface-900 mt-1">{pacienteAvulso.nome_completo}</h2>
+                <div className="flex items-center gap-3 mt-1 text-sm text-surface-500">
+                  {pacienteAvulso.data_nascimento && <span>{calcularIdade(pacienteAvulso.data_nascimento)}a • {formatDate(pacienteAvulso.data_nascimento)}</span>}
+                  <span>• {pacienteAvulso.sexo === 'F' ? 'Feminino' : 'Masculino'}</span>
+                  {pacienteAvulso.cpf && <span>• CPF: {maskCPF(pacienteAvulso.cpf)}</span>}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {historico.length > 0 && (
+                  <button onClick={() => setShowHistorico(!showHistorico)}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors font-medium">
+                    Historico ({historico.length})
+                  </button>
+                )}
+                <button onClick={() => { setPacienteAvulso(null); setForm(EMPTY_FORM); setHistorico([]); }}
+                  className="text-xs px-3 py-1.5 rounded-lg bg-surface-100 text-surface-600 hover:bg-surface-200 transition-colors">Voltar</button>
+              </div>
+            </div>
+            {historico.length > 0 && !showHistorico && (
+              <div className="mt-2 px-3 py-2 bg-amber-50 rounded-lg text-xs text-amber-700">
+                Paciente com {historico.length} triagem(ns) anterior(es). Dados pre-preenchidos. PA, HGT e data sessao em branco.
+              </div>
+            )}
+          </div>
+
+          {/* History */}
+          {showHistorico && historico.length > 0 && (
+            <div className="px-6 py-3 bg-amber-50 border-b border-amber-200 max-h-48 overflow-y-auto">
+              <h4 className="text-xs font-semibold text-amber-800 mb-2">Historico de Triagens</h4>
+              {historico.map((h) => (
+                <div key={h.id} className="text-xs text-amber-700 mb-1">
+                  <span className="font-medium">{formatDate(h.created_at, 'dd/MM/yyyy HH:mm')}</span>
+                  {' — '}PA: {h.pressao_arterial || '—'} | HGT: {h.hgt || '—'}
+                  {h.observacao && ` | Obs: ${h.observacao}`}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {loading ? (
+            <div className="p-12 text-center text-surface-400">Carregando...</div>
+          ) : (
+            <div className="p-6 space-y-6 max-h-[calc(100vh-350px)] overflow-y-auto">
+              {/* SAME FORM FIELDS as regular triage */}
+              <div>
+                <h3 className="text-sm font-semibold text-surface-700 mb-3 flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-blue-500"></span>Dados Clinicos</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div><label className="block text-xs font-medium text-surface-600 mb-1">Alergia</label><input type="text" value={form.alergia} onChange={e => setForm(f => ({ ...f, alergia: e.target.value }))} placeholder="Nenhuma / descrever..." className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400" /></div>
+                  <div><label className="block text-xs font-medium text-surface-600 mb-1">Pressao Arterial</label><input type="text" value={form.pressao_arterial} onChange={e => setForm(f => ({ ...f, pressao_arterial: e.target.value }))} placeholder="Ex: 120/80" className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400" /></div>
+                  <div><label className="block text-xs font-medium text-surface-600 mb-1">HGT (mg/dL)</label><input type="text" value={form.hgt} onChange={e => setForm(f => ({ ...f, hgt: e.target.value }))} placeholder="Ex: 95" className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400" /></div>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-semibold text-surface-700 mb-3 flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-red-500"></span>Historico de Doencas</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {[{ key: 'diabetes', label: 'Diabetes' },{ key: 'hipertensao', label: 'Hipertensao' },{ key: 'doencas_cardiacas', label: 'Doencas Cardiacas' },{ key: 'doencas_hepaticas', label: 'Doencas Hepaticas' },{ key: 'doencas_renais', label: 'Doencas Renais' }].map(item => (
+                    <label key={item.key} className={cn('flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors', (form as any)[item.key] ? 'bg-red-50 border-red-300 text-red-700' : 'border-surface-200 text-surface-600 hover:bg-surface-50')}>
+                      <input type="checkbox" checked={(form as any)[item.key]} onChange={e => setForm(f => ({ ...f, [item.key]: e.target.checked }))} className="rounded text-red-600 focus:ring-red-300" />
+                      <span className="text-sm">{item.label}</span>
+                    </label>
+                  ))}
+                </div>
+                <div className="mt-3"><label className="block text-xs font-medium text-surface-600 mb-1">Outras Doencas</label><input type="text" value={form.outras_doencas} onChange={e => setForm(f => ({ ...f, outras_doencas: e.target.value }))} placeholder="Descrever..." className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400" /></div>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-semibold text-surface-700 mb-3 flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-orange-500"></span>Historico de Escleroterapia</h3>
+                <div className="space-y-3">
+                  <label className={cn('flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors', form.escleroterapia_anterior ? 'bg-orange-50 border-orange-300 text-orange-700' : 'border-surface-200 text-surface-600 hover:bg-surface-50')}><input type="checkbox" checked={form.escleroterapia_anterior} onChange={e => setForm(f => ({ ...f, escleroterapia_anterior: e.target.checked }))} className="rounded text-orange-600 focus:ring-orange-300" /><span className="text-sm">Ja foi submetido(a) a escleroterapia antes?</span></label>
+                  {form.escleroterapia_anterior && <input type="text" value={form.escleroterapia_quando} onChange={e => setForm(f => ({ ...f, escleroterapia_quando: e.target.value }))} placeholder="Quando?" className="w-full px-3 py-2 border border-orange-200 rounded-lg text-sm bg-orange-50" />}
+                  <label className={cn('flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors', form.trombose_embolia ? 'bg-red-50 border-red-300 text-red-700' : 'border-surface-200 text-surface-600 hover:bg-surface-50')}><input type="checkbox" checked={form.trombose_embolia} onChange={e => setForm(f => ({ ...f, trombose_embolia: e.target.checked }))} className="rounded text-red-600 focus:ring-red-300" /><span className="text-sm">Trombose ou Embolia Pulmonar?</span></label>
+                  {form.trombose_embolia && <input type="text" value={form.trombose_embolia_detalhe} onChange={e => setForm(f => ({ ...f, trombose_embolia_detalhe: e.target.value }))} placeholder="Detalhar..." className="w-full px-3 py-2 border border-red-200 rounded-lg text-sm bg-red-50" />}
+                  <label className={cn('flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors', form.doencas_vasculares ? 'bg-orange-50 border-orange-300 text-orange-700' : 'border-surface-200 text-surface-600 hover:bg-surface-50')}><input type="checkbox" checked={form.doencas_vasculares} onChange={e => setForm(f => ({ ...f, doencas_vasculares: e.target.checked }))} className="rounded text-orange-600 focus:ring-orange-300" /><span className="text-sm">Doencas Vasculares?</span></label>
+                  {form.doencas_vasculares && <input type="text" value={form.doencas_vasculares_detalhe} onChange={e => setForm(f => ({ ...f, doencas_vasculares_detalhe: e.target.value }))} placeholder="Detalhar..." className="w-full px-3 py-2 border border-orange-200 rounded-lg text-sm bg-orange-50" />}
+                  <label className={cn('flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors', form.doppler_venoso ? 'bg-blue-50 border-blue-300 text-blue-700' : 'border-surface-200 text-surface-600 hover:bg-surface-50')}><input type="checkbox" checked={form.doppler_venoso} onChange={e => setForm(f => ({ ...f, doppler_venoso: e.target.checked }))} className="rounded text-blue-600 focus:ring-blue-300" /><span className="text-sm">Doppler Venoso?</span></label>
+                  {form.doppler_venoso && <input type="text" value={form.doppler_venoso_detalhe} onChange={e => setForm(f => ({ ...f, doppler_venoso_detalhe: e.target.value }))} placeholder="Resultado..." className="w-full px-3 py-2 border border-blue-200 rounded-lg text-sm bg-blue-50" />}
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-semibold text-surface-700 mb-3 flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-pink-500"></span>Outras Informacoes</h3>
+                {pacienteAvulso?.sexo === 'F' && (
+                  <label className={cn('flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors mb-3', form.gravidez_amamentacao ? 'bg-pink-50 border-pink-300 text-pink-700' : 'border-surface-200 text-surface-600 hover:bg-surface-50')}><input type="checkbox" checked={form.gravidez_amamentacao} onChange={e => setForm(f => ({ ...f, gravidez_amamentacao: e.target.checked }))} className="rounded text-pink-600 focus:ring-pink-300" /><span className="text-sm">Gravidez ou Amamentacao?</span></label>
+                )}
+                <div><label className="block text-xs font-medium text-surface-600 mb-1">Observacao</label><textarea value={form.observacao} onChange={e => setForm(f => ({ ...f, observacao: e.target.value }))} rows={3} placeholder="Observacoes..." className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-300 resize-none" /></div>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-semibold text-surface-700 mb-3 flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-emerald-500"></span>Agendamento</h3>
+                <div><label className="block text-xs font-medium text-surface-600 mb-1">Data da Proxima Sessao</label><input type="date" value={form.data_proxima_sessao} onChange={e => setForm(f => ({ ...f, data_proxima_sessao: e.target.value }))} className="w-full sm:w-64 px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-300" /></div>
+              </div>
+
+              <div className="flex items-center gap-3 pt-4 border-t border-surface-100">
+                <button onClick={handleSalvarTriagemAvulsa} disabled={saving}
+                  className="flex-1 sm:flex-none px-6 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 transition-colors">
+                  {saving ? 'Salvando...' : 'Salvar Triagem Avulsa'}
+                </button>
+                <button onClick={() => { setPacienteAvulso(null); setShowNovaTriagem(false); setForm(EMPTY_FORM); }}
+                  disabled={saving} className="px-4 py-2.5 bg-surface-100 text-surface-700 rounded-lg text-sm font-medium hover:bg-surface-200 disabled:opacity-50 transition-colors">Cancelar</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* LEFT: Patient Queue */}
