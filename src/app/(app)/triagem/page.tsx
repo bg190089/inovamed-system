@@ -756,8 +756,8 @@ export default function TriagemPage() {
                         { name: 'BRENDA DE LIMA LEITE', crm: '030028' },
                       ];
 
-                      // Check if medico_nome is not in the doctors list (means "Outro")
-                      const isOutroMedico = !doctorsList.find(d => d.name === sessao.medico_nome);
+                      // Check if medico_nome is typed (not in the dropdown list and not empty/OUTRO)
+                      const isOutroMedico = sessao.medico_nome !== '' && sessao.medico_nome !== 'OUTRO' && !doctorsList.find(d => d.name === sessao.medico_nome);
 
                       return (
                         <div key={idx} className="flex items-end gap-2 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
@@ -782,18 +782,33 @@ export default function TriagemPage() {
                           </div>
                           <div className="flex-1">
                             <label className="block text-xs font-medium text-surface-600 mb-1">Médico</label>
-                            {isOutroMedico ? (
-                              <input
-                                type="text"
-                                value={sessao.medico_nome}
-                                onChange={e => {
-                                  const newSessoes = [...sessoesAnteriores];
-                                  newSessoes[idx].medico_nome = e.target.value;
-                                  setSessoesAnteriores(newSessoes);
-                                }}
-                                placeholder="Nome do médico"
-                                className="w-full px-3 py-2 border border-emerald-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400 bg-white"
-                              />
+                            {isOutroMedico || sessao.medico_nome === 'OUTRO' ? (
+                              <div className="flex gap-1">
+                                <input
+                                  type="text"
+                                  value={sessao.medico_nome === 'OUTRO' ? '' : sessao.medico_nome}
+                                  onChange={e => {
+                                    const newSessoes = [...sessoesAnteriores];
+                                    newSessoes[idx].medico_nome = e.target.value;
+                                    setSessoesAnteriores(newSessoes);
+                                  }}
+                                  placeholder="Digite o nome do médico"
+                                  autoFocus
+                                  className="flex-1 px-3 py-2 border border-emerald-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400 bg-white"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const newSessoes = [...sessoesAnteriores];
+                                    newSessoes[idx].medico_nome = '';
+                                    setSessoesAnteriores(newSessoes);
+                                  }}
+                                  className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded text-xs hover:bg-emerald-200"
+                                  title="Voltar para lista"
+                                >
+                                  Lista
+                                </button>
+                              </div>
                             ) : (
                               <select
                                 value={sessao.medico_nome}
