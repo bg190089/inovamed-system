@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useSupabase } from '@/hooks/useSupabase';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { PacienteService, AgendamentoService, AtendimentoService } from '@/lib/services';
+import type { EscalaDoDia } from '@/lib/services';
 import { toast } from 'sonner';
 import { maskCPF, formatDate, calcularIdade, cn, unmask } from '@/lib/utils';
 import { ConfirmDialog, EmptyState, PageHeader } from '@/components/ui';
@@ -40,6 +41,8 @@ export default function AgendamentoPage() {
     data_nascimento: '',
     sexo: 'F' as 'M' | 'F',
   });
+
+  const [escalaDoDia, setEscalaDoDia] = useState<EscalaDoDia[]>([]);
 
   const [form, setForm] = useState({
     data_agendamento: new Date().toISOString().split('T')[0],
@@ -148,6 +151,22 @@ export default function AgendamentoPage() {
       };
     }
   }, [selectedUnidade, loadAgendamentos, supabase, agendamentoService]);
+
+  // Carregar escala do dia quando data ou unidade mudam
+  useEffect(() => {
+    async function loadEscala() {
+      if (!selectedUnidade) return;
+      const municipioNome = (selectedUnidade as any)?.municipio?.nome;
+      if (!municipioNome) return;
+      try {
+        const escala = await agendamentoService.getEscalaDoDia(selectedDate, municipioNome);
+        setEscalaDoDia(escala);
+      } catch {
+        setEscalaDoDia([]);
+      }
+    }
+    loadEscala();
+  }, [selectedDate, selectedUnidade, agendamentoService]);
 
   useEffect(() => {
     const t = setTimeout(async () => {
@@ -394,6 +413,10 @@ export default function AgendamentoPage() {
         action={
           <button onClick={() => {
             resetAndClose();
+            // Pré-selecionar profissional escalado do dia
+            if (escalaDoDia.length === 1 && escalaDoDia[0].profissional_id) {
+              setForm(prev => ({ ...prev, profissional_id: escalaDoDia[0].profissional_id! }));
+            }
             setShowModal(true);
           }} className="btn-primary text-sm">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -465,6 +488,28 @@ export default function AgendamentoPage() {
           </button>
         </div>
       </div>
+
+      {/* Escala do Dia */}
+      {escalaDoDia.length > 0 && (
+        <div className="mb-4 card p-3 bg-brand-50 border border-brand-200">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-brand-600 font-bold text-xs uppercase tracking-wide">Escala do Dia</span>
+            <span className="text-xs text-brand-400">({fmtDateLocal(selectedDate)})</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {escalaDoDia.map((e, i) => (
+              <span key={i} className="inline-flex items-center gap-1.5 bg-white border border-brand-200 rounded-lg px-3 py-1.5 text-sm">
+                <span className="text-brand-700 font-semibold">Dr(a). {e.medico_nome_escala}</span>
+                {e.profissional_id && (
+                  <svg className="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 md:gap-4 mb-6">
@@ -992,12 +1037,18 @@ export default function AgendamentoPage() {
                         <label className="input-label">Profissional <span className="text-red-500">*</span></label>
                         <select value={form.profissional_id} onChange={(e) => setForm({ ...form, profissional_id: e.target.value })} className="input-field">
                           <option value="">Selecione...</option>
-                          {profissionais.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              Dr(a). {p.nome_completo}
-                            </option>
-                          ))}
+                          {profissionais.map((p) => {
+                            const isEscalado = escalaDoDia.some(e => e.profissional_id === p.id);
+                            return (
+                              <option key={p.id} value={p.id}>
+                                {isEscalado ? '★ ' : ''}Dr(a). {p.nome_completo}{isEscalado ? ' (Escalado)' : ''}
+                              </option>
+                            );
+                          })}
                         </select>
+                        {escalaDoDia.length > 0 && (
+                          <p className="text-xs text-brand-600 mt-1">★ = Profissional escalado para este dia nesta unidade</p>
+                        )}
                       </div>
                     </div>
 
