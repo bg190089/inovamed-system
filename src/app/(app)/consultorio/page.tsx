@@ -325,7 +325,9 @@ export default function ConsultorioPage() {
     // 1) Try profissional relation (already loaded via FULL_SELECT)
     const prof = atend.profissional as any;
     const assinatura = atend.assinatura_medico || prof?.assinatura_digital || '';
-    const nome = prof?.nome_completo || user?.nome_completo || 'Medico';
+    const rawNome = prof?.nome_completo || user?.nome_completo || 'Medico';
+    // Strip DR./DRA. prefix since we add "Dr(a)." in the templates
+    const nome = rawNome.replace(/^(DR\.?|DRA\.?)\s*/i, '').trim() || rawNome;
     const cbo = prof?.cbo || atend.cbo_profissional || '';
     const cns = prof?.cns || atend.cns_profissional || '';
     return { assinatura, nome, cbo, cns };
@@ -372,7 +374,7 @@ export default function ConsultorioPage() {
           p_profissional_id: atend.profissional_id || user?.id,
         });
         if (rpcData?.[0]?.assinatura_digital) doc.assinatura = rpcData[0].assinatura_digital;
-        if (rpcData?.[0]?.nome_completo) doc.nome = rpcData[0].nome_completo;
+        if (rpcData?.[0]?.nome_completo) doc.nome = rpcData[0].nome_completo.replace(/^(DR\.?|DRA\.?)\s*/i, '').trim();
         if (rpcData?.[0]?.cbo) doc.cbo = rpcData[0].cbo;
         if (rpcData?.[0]?.cns) doc.cns = rpcData[0].cns;
       } catch { /* ignore */ }
@@ -485,7 +487,7 @@ export default function ConsultorioPage() {
     <div className="p-6 lg:p-8 max-w-7xl mx-auto pt-16 lg:pt-0">
       <PageHeader
         title="Consultorio"
-        subtitle={`Dr(a). ${user?.nome_completo?.split(' ')[0]} • ${(selectedUnidade as any)?.municipio?.nome || '—'} • ${formatDate(new Date(), 'dd/MM/yyyy')}`}
+        subtitle={`Dr(a). ${(user?.nome_completo || '').replace(/^(DR\.?|DRA\.?)\s*/i, '').split(' ').filter(Boolean).slice(0, 2).map(w => w.charAt(0) + w.slice(1).toLowerCase()).join(' ')} • ${(selectedUnidade as any)?.municipio?.nome || '—'} • ${formatDate(new Date(), 'dd/MM/yyyy')}`}
       />
 
       {/* Queue Summary Cards */}
