@@ -167,9 +167,14 @@ export default function ConsultorioPage() {
     });
     const hist = await service.getHistoricoPaciente(atend.paciente_id);
     setHistorico(hist);
-    // Load session count
+    // Load session count (including sessoes_anteriores from pacientes table)
     const sessoes = await service.contarSessoes12Meses(atend.paciente_id);
-    setSessoesPaciente(sessoes);
+    let totalSessoes = sessoes;
+    // Add sessoes_anteriores count if available
+    if (atend.paciente?.sessoes_anteriores && Array.isArray(atend.paciente.sessoes_anteriores)) {
+      totalSessoes += atend.paciente.sessoes_anteriores.length;
+    }
+    setSessoesPaciente(totalSessoes);
     // Load triagem data
     try {
       const triagem = await triagemService.getUltimaTriagem(atend.paciente_id);
@@ -200,7 +205,12 @@ export default function ConsultorioPage() {
           const hist = await service.getHistoricoPaciente(atend.paciente_id);
           setHistorico(hist);
           const sessoes = await service.contarSessoes12Meses(atend.paciente_id);
-          setSessoesPaciente(sessoes);
+          let totalSessoes = sessoes;
+          // Add sessoes_anteriores count if available
+          if (atend.paciente?.sessoes_anteriores && Array.isArray(atend.paciente.sessoes_anteriores)) {
+            totalSessoes += atend.paciente.sessoes_anteriores.length;
+          }
+          setSessoesPaciente(totalSessoes);
           setShowFinalizados(false);
           loadFilaMedico();
           loadFilaUnidade();

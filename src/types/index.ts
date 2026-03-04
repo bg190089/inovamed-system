@@ -52,6 +52,12 @@ export interface Profissional {
   unidades?: Unidade[];
 }
 
+export interface SessaoAnterior {
+  numero: number;
+  data: string;
+  medico_nome: string;
+}
+
 export interface Paciente {
   id: string;
   nome_completo: string;
@@ -68,6 +74,7 @@ export interface Paciente {
   uf: string;
   telefone?: string;
   email?: string;
+  sessoes_anteriores?: SessaoAnterior[];
   created_at: string;
 }
 
