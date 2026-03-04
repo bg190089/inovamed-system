@@ -306,33 +306,38 @@ export default function TriagemPage() {
       });
 
       // Update atendimento: link triagem and move to doctor's queue
-      if (encaminhar) {
-        await atendimentoService.atualizarStatus(selectedAtend.id, 'aguardando', {
-          triagem_id: triagem.id,
-        });
-        toast.success(`${selectedAtend.paciente?.nome_completo} encaminhado(a) para o médico`);
-      } else {
-        // Just save triagem without changing status
-        await supabase.from('atendimentos').update({ triagem_id: triagem.id }).eq('id', selectedAtend.id);
-        toast.success('Triagem salva');
+      try {
+        if (encaminhar) {
+          await atendimentoService.atualizarStatus(selectedAtend.id, 'aguardando', {
+            triagem_id: triagem.id,
+          });
+          toast.success(`${selectedAtend.paciente?.nome_completo} encaminhado(a) para o médico`);
+        } else {
+          await supabase.from('atendimentos').update({ triagem_id: triagem.id }).eq('id', selectedAtend.id);
+          toast.success('Triagem salva');
+        }
+      } catch (e: any) {
+        console.error('Erro ao atualizar atendimento:', e);
+        toast.error('Erro ao encaminhar: ' + (e?.message || ''));
       }
 
-      // Create agendamento if data_proxima_sessao is set
+      // Create agendamento if data_proxima_sessao is set (independent of above)
       if (form.data_proxima_sessao) {
         try {
-          await agendamentoService.createAgendamento({
+          const agendPayload: Record<string, any> = {
             empresa_id: selectedEmpresa?.id,
             unidade_id: selectedUnidade.id,
             paciente_id: selectedAtend.paciente_id,
-            profissional_id: selectedAtend.profissional_id,
-            procedimento_id: selectedAtend.procedimento_id,
             data_agendamento: form.data_proxima_sessao,
             horario_inicio: '08:00',
             horario_fim: '09:00',
             numero_sessao: 1,
             status: 'agendado',
             observacoes: '[SESSAO] Agendado via triagem',
-          });
+          };
+          if (selectedAtend.profissional_id) agendPayload.profissional_id = selectedAtend.profissional_id;
+          if (selectedAtend.procedimento_id) agendPayload.procedimento_id = selectedAtend.procedimento_id;
+          await agendamentoService.createAgendamento(agendPayload);
           toast.success(`Agendamento criado para ${formatDate(form.data_proxima_sessao)}`);
         } catch (e: any) {
           console.error('Erro ao criar agendamento:', e);
