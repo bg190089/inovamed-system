@@ -38,6 +38,18 @@ export async function POST(request: NextRequest) {
     });
     if (profError) return NextResponse.json({ error: profError.message }, { status: 400 });
 
+    // Send welcome email (non-blocking)
+    try {
+      await fetch(new URL('/api/admin/send-welcome-email', request.url), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, nome_completo }),
+      });
+    } catch (emailErr) {
+      // Log error but don't fail the user creation
+      console.error('Failed to send welcome email:', emailErr);
+    }
+
     return NextResponse.json({ success: true, user_id: authData.user.id });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

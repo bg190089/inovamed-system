@@ -9,6 +9,9 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [sendingReset, setSendingReset] = useState(false);
   const router = useRouter();
   const supabase = createClient();
 
@@ -18,7 +21,7 @@ export default function LoginPage() {
 
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
-      
+
       if (error) {
         toast.error('Credenciais inválidas. Verifique e tente novamente.');
         return;
@@ -30,6 +33,36 @@ export default function LoginPage() {
       toast.error('Erro ao fazer login');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleForgotPassword(e: React.FormEvent) {
+    e.preventDefault();
+
+    if (!forgotEmail) {
+      toast.error('Por favor, digite seu e-mail');
+      return;
+    }
+
+    setSendingReset(true);
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
+        redirectTo: 'https://inovamed-system.vercel.app/reset-password',
+      });
+
+      if (error) {
+        toast.error('Erro ao enviar e-mail de recuperacao. Verifique o e-mail e tente novamente.');
+        return;
+      }
+
+      toast.success('E-mail de recuperacao enviado! Verifique sua caixa de entrada.');
+      setForgotEmail('');
+      setShowForgotPassword(false);
+    } catch (err) {
+      toast.error('Erro ao solicitar recuperacao de senha');
+    } finally {
+      setSendingReset(false);
     }
   }
 
@@ -130,6 +163,13 @@ export default function LoginPage() {
                 placeholder="••••••••"
                 required
               />
+              <button
+                type="button"
+                onClick={() => setShowForgotPassword(true)}
+                className="text-xs text-brand-600 hover:text-brand-700 font-medium mt-2"
+              >
+                Esqueci minha senha
+              </button>
             </div>
 
             <button
@@ -152,6 +192,61 @@ export default function LoginPage() {
             Inovamed &copy; {new Date().getFullYear()} &mdash; Todos os direitos reservados
           </p>
         </div>
+
+        {/* Forgot Password Modal */}
+        {showForgotPassword && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6 space-y-4">
+              <h3 className="font-display font-semibold text-surface-800 text-lg">Recuperar Senha</h3>
+
+              <p className="text-sm text-surface-600">
+                Digite seu e-mail para receber um link de recuperacao de senha:
+              </p>
+
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                <div>
+                  <label className="input-label">E-mail</label>
+                  <input
+                    type="email"
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    className="input-field"
+                    placeholder="seu@email.com"
+                    required
+                    autoFocus
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowForgotPassword(false);
+                      setForgotEmail('');
+                    }}
+                    className="flex-1 btn-secondary"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={sendingReset}
+                    className="flex-1 btn-primary"
+                  >
+                    {sendingReset ? (
+                      <div className="flex items-center gap-2 justify-center">
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Enviando...
+                      </div>
+                    ) : (
+                      'Enviar'
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

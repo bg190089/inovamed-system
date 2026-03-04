@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSupabase } from '@/hooks/useSupabase';
-import { PacienteService, AtendimentoService, TriagemService, DocumentoService } from '@/lib/services';
+import { PacienteService, AtendimentoService, TriagemService, DocumentoService, AgendamentoService } from '@/lib/services';
 import type { Triagem } from '@/lib/services/triagemService';
 import type { DocumentoPaciente } from '@/lib/services/documentoService';
 import { toast } from 'sonner';
@@ -27,6 +27,7 @@ export default function PacientesPage() {
   const atendimentoService = useMemo(() => new AtendimentoService(supabase), [supabase]);
   const triagemService = useMemo(() => new TriagemService(supabase), [supabase]);
   const documentoService = useMemo(() => new DocumentoService(supabase), [supabase]);
+  const agendamentoService = useMemo(() => new AgendamentoService(supabase), [supabase]);
 
   // Search
   const [searchTerm, setSearchTerm] = useState('');
@@ -56,6 +57,8 @@ export default function PacientesPage() {
     sexo: 'F' as 'F' | 'M', telefone: '', email: '',
     cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', uf: 'BA',
   });
+  const [sessoesAnteriores, setSessoesAnteriores] = useState<{data: string; medico_nome: string}[]>([]);
+  const [cadastroProximaSessao, setCadastroProximaSessao] = useState('');
 
   // QR Code
   const [showQR, setShowQR] = useState(false);
@@ -89,12 +92,54 @@ export default function PacientesPage() {
         uf: novoPaciente.uf || 'BA',
       });
       toast.success(`Paciente ${created.nome_completo} cadastrado com sucesso!`);
+
+      // Save sessões anteriores
+      const sessoes_anteriores_data = sessoesAnteriores.map((s, idx) => ({
+        numero: idx + 1,
+        data: s.data,
+        medico_nome: s.medico_nome,
+      }));
+
+      if (sessoes_anteriores_data.length > 0) {
+        await pacienteService.atualizar(created.id, {
+          sessoes_anteriores: sessoes_anteriores_data,
+        });
+      }
+
+      // Create agendamento for next session if date provided
+      if (cadastroProximaSessao && selectedUnidade) {
+        try {
+          const { data: empresas } = await supabase.from('empresas').select('id').limit(1);
+          const empresaId = empresas?.[0]?.id;
+          const { data: procs } = await supabase.from('procedimentos').select('id').limit(1);
+          const procId = procs?.[0]?.id;
+
+          const proximoNumeroSessao = sessoes_anteriores_data.length + 1;
+          await agendamentoService.createAgendamento({
+            empresa_id: empresaId,
+            unidade_id: selectedUnidade.id,
+            paciente_id: created.id,
+            procedimento_id: procId,
+            data_agendamento: cadastroProximaSessao,
+            numero_sessao: proximoNumeroSessao,
+            status: 'agendado',
+            observacoes: `[SESSAO] Agendado via cadastro de paciente - Sessão ${proximoNumeroSessao}`,
+          });
+          toast.success(`Agendamento criado para sessão ${proximoNumeroSessao}`);
+        } catch (err: any) {
+          console.error('Erro ao criar agendamento:', err);
+          toast.warning('Paciente cadastrado, mas houve erro ao criar agendamento');
+        }
+      }
+
       setShowCadastro(false);
       setNovoPaciente({
         nome_completo: '', cpf: '', cns: '', data_nascimento: '',
         sexo: 'F', telefone: '', email: '',
         cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', uf: 'BA',
       });
+      setSessoesAnteriores([]);
+      setCadastroProximaSessao('');
       // Select the newly created patient
       selectPaciente(created);
     } catch (err: any) {
@@ -457,6 +502,136 @@ export default function PacientesPage() {
                 ))}
               </select>
             </div>
+          </div>
+
+          {/* Sessões Anteriores */}
+          <p className="text-xs font-bold text-emerald-700 uppercase mb-2 flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+            Sessões Anteriores
+          </p>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs text-surface-500">Registre sessões de escleroterapia realizadas anteriormente</p>
+            <button
+              type="button"
+              onClick={() => setSessoesAnteriores([...sessoesAnteriores, { data: '', medico_nome: '' }])}
+              className="px-3 py-1.5 bg-emerald-600 text-white text-xs font-medium rounded-lg hover:bg-emerald-700 transition-colors"
+            >
+              + Adicionar Sessão
+            </button>
+          </div>
+
+          {sessoesAnteriores.length > 0 && (
+            <div className="space-y-2 mb-4">
+              {sessoesAnteriores.map((sessao, idx) => {
+                const doctorsList = [
+                  { name: 'LUCAS PORTELA TAVARES', crm: '033657' },
+                  { name: 'VITORIA CASTRO MARCOS', crm: '028890' },
+                  { name: 'LAIS CARVALHO MUHANA ALVES', crm: '034812' },
+                  { name: 'ALINE FERNANDES MANGABEIRA', crm: '033167' },
+                  { name: 'MARIANA SANTOS PIRES', crm: '029434' },
+                  { name: 'VICTOR PORTO SALES', crm: '029742' },
+                  { name: 'GUSTAVO SILVA DOS SANTOS', crm: '026902' },
+                  { name: 'BRENDA DE LIMA LEITE', crm: '030028' },
+                ];
+
+                const isOutroMedico = sessao.medico_nome !== '' && sessao.medico_nome !== 'OUTRO' && !doctorsList.find(d => d.name === sessao.medico_nome);
+
+                return (
+                  <div key={idx} className="flex items-end gap-2 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+                    <div className="w-12">
+                      <label className="block text-xs font-medium text-surface-600 mb-1">Sessão</label>
+                      <div className="px-3 py-2 bg-white rounded-lg text-sm font-medium text-surface-700 border border-emerald-200">
+                        {idx + 1}
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <label className="block text-xs font-medium text-surface-600 mb-1">Data</label>
+                      <input
+                        type="date"
+                        value={sessao.data}
+                        onChange={e => {
+                          const newSessoes = [...sessoesAnteriores];
+                          newSessoes[idx].data = e.target.value;
+                          setSessoesAnteriores(newSessoes);
+                        }}
+                        className="w-full px-3 py-2 border border-emerald-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400 bg-white"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="block text-xs font-medium text-surface-600 mb-1">Médico</label>
+                      {isOutroMedico || sessao.medico_nome === 'OUTRO' ? (
+                        <div className="flex gap-1">
+                          <input
+                            type="text"
+                            value={sessao.medico_nome === 'OUTRO' ? '' : sessao.medico_nome}
+                            onChange={e => {
+                              const newSessoes = [...sessoesAnteriores];
+                              newSessoes[idx].medico_nome = e.target.value;
+                              setSessoesAnteriores(newSessoes);
+                            }}
+                            placeholder="Digite o nome do médico"
+                            autoFocus
+                            className="flex-1 px-3 py-2 border border-emerald-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400 bg-white"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newSessoes = [...sessoesAnteriores];
+                              newSessoes[idx].medico_nome = '';
+                              setSessoesAnteriores(newSessoes);
+                            }}
+                            className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded text-xs hover:bg-emerald-200"
+                            title="Voltar para lista"
+                          >
+                            Lista
+                          </button>
+                        </div>
+                      ) : (
+                        <select
+                          value={sessao.medico_nome}
+                          onChange={e => {
+                            const newSessoes = [...sessoesAnteriores];
+                            newSessoes[idx].medico_nome = e.target.value;
+                            setSessoesAnteriores(newSessoes);
+                          }}
+                          className="w-full px-3 py-2 border border-emerald-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400 bg-white"
+                        >
+                          <option value="">Selecione o médico...</option>
+                          {doctorsList.map(doc => (
+                            <option key={doc.crm} value={doc.name}>
+                              {doc.name}
+                            </option>
+                          ))}
+                          <option value="OUTRO">Outro (digitar)</option>
+                        </select>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newSessoes = sessoesAnteriores.filter((_, i) => i !== idx);
+                        setSessoesAnteriores(newSessoes);
+                      }}
+                      className="px-3 py-2 bg-red-100 text-red-700 rounded-lg text-sm font-medium hover:bg-red-200 transition-colors"
+                    >
+                      X
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Data da Próxima Sessão */}
+          <div className="mb-4">
+            <label className="input-label">Data da Próxima Sessão (Opcional)</label>
+            <input
+              type="date"
+              value={cadastroProximaSessao}
+              onChange={e => setCadastroProximaSessao(e.target.value)}
+              className="input-field max-w-xs"
+            />
+            <p className="text-xs text-surface-400 mt-1">Se preenchido, cria um agendamento automaticamente</p>
           </div>
 
           <div className="flex gap-3 pt-2 border-t border-surface-200">

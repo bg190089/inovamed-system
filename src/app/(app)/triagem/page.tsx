@@ -81,9 +81,6 @@ export default function TriagemPage() {
     numero: '', complemento: '', bairro: '', cidade: '', uf: 'BA',
   });
 
-  // Sessoes anteriores
-  const [sessoesAnteriores, setSessoesAnteriores] = useState<{data: string; medico_nome: string}[]>([]);
-  const [cadastroProximaSessao, setCadastroProximaSessao] = useState('');
 
   // TCLE (Termo de Consentimento)
   const [showTcle, setShowTcle] = useState(false);
@@ -196,13 +193,6 @@ export default function TriagemPage() {
       const telClean = novoPaciente.telefone.replace(/\D/g, '');
       const cepClean = novoPaciente.cep.replace(/\D/g, '');
 
-      // Prepare sessoes_anteriores with session numbers
-      const sessoes_anteriores = sessoesAnteriores.map((s, idx) => ({
-        numero: idx + 1,
-        data: s.data,
-        medico_nome: s.medico_nome,
-      }));
-
       const created = await pacienteService.criar({
         nome_completo: novoPaciente.nome_completo.trim().toUpperCase(),
         cpf: cpfClean || undefined,
@@ -217,40 +207,13 @@ export default function TriagemPage() {
         bairro: novoPaciente.bairro.trim() || undefined,
         cidade: novoPaciente.cidade.trim() || undefined,
         uf: novoPaciente.uf || 'BA',
-        sessoes_anteriores: sessoes_anteriores.length > 0 ? sessoes_anteriores : undefined,
       });
       toast.success(`Paciente ${created.nome_completo} cadastrado!`);
-
-      // Create agendamento if cadastroProximaSessao is set
-      if (cadastroProximaSessao && selectedEmpresa && selectedUnidade) {
-        try {
-          const defaultProc = procedimentos.find(p => p.tipo === 'bilateral') || procedimentos[0];
-          const proximoNumeroSessao = sessoes_anteriores.length + 1;
-          await agendamentoService.createAgendamento({
-            empresa_id: selectedEmpresa.id,
-            unidade_id: selectedUnidade.id,
-            paciente_id: created.id,
-            procedimento_id: defaultProc?.id,
-            data_agendamento: cadastroProximaSessao,
-            horario_inicio: '08:00',
-            horario_fim: '09:00',
-            numero_sessao: proximoNumeroSessao,
-            status: 'agendado',
-            observacoes: `[SESSAO] Agendado via cadastro de paciente - Sessão ${proximoNumeroSessao}`,
-          });
-          toast.success(`Agendamento criado para ${formatDate(cadastroProximaSessao)}`);
-        } catch (e: any) {
-          console.error('Erro ao criar agendamento:', e);
-          toast.error('Erro ao criar agendamento: ' + (e?.message || ''));
-        }
-      }
 
       // Ir direto para triagem do novo paciente
       handleSelectPacienteAvulso(created);
       setShowCadastroPaciente(false);
       setNovoPaciente({ nome_completo: '', cpf: '', cns: '', data_nascimento: '', sexo: 'F', telefone: '', cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', uf: 'BA' });
-      setSessoesAnteriores([]);
-      setCadastroProximaSessao('');
     } catch (err: any) {
       toast.error(err.message || 'Erro ao cadastrar paciente');
     } finally { setSalvandoPaciente(false); }
@@ -729,140 +692,13 @@ export default function TriagemPage() {
                 </div>
               </div>
 
-              {/* Sessões Anteriores Section */}
-              <div className="border-t border-surface-200 pt-4 mt-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-surface-700">Sessões Anteriores</h3>
-                  <button
-                    type="button"
-                    onClick={() => setSessoesAnteriores([...sessoesAnteriores, { data: '', medico_nome: '' }])}
-                    className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-medium hover:bg-emerald-700 transition-colors"
-                  >
-                    + Adicionar Sessão
-                  </button>
-                </div>
-
-                {sessoesAnteriores.length > 0 && (
-                  <div className="space-y-2 mb-4">
-                    {sessoesAnteriores.map((sessao, idx) => {
-                      const doctorsList = [
-                        { name: 'LUCAS PORTELA TAVARES', crm: '033657' },
-                        { name: 'VITORIA CASTRO MARCOS', crm: '028890' },
-                        { name: 'LAIS CARVALHO MUHANA ALVES', crm: '034812' },
-                        { name: 'ALINE FERNANDES MANGABEIRA', crm: '033167' },
-                        { name: 'MARIANA SANTOS PIRES', crm: '029434' },
-                        { name: 'VICTOR PORTO SALES', crm: '029742' },
-                        { name: 'GUSTAVO SILVA DOS SANTOS', crm: '026902' },
-                        { name: 'BRENDA DE LIMA LEITE', crm: '030028' },
-                      ];
-
-                      // Check if medico_nome is typed (not in the dropdown list and not empty/OUTRO)
-                      const isOutroMedico = sessao.medico_nome !== '' && sessao.medico_nome !== 'OUTRO' && !doctorsList.find(d => d.name === sessao.medico_nome);
-
-                      return (
-                        <div key={idx} className="flex items-end gap-2 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
-                          <div className="w-12">
-                            <label className="block text-xs font-medium text-surface-600 mb-1">Sessão</label>
-                            <div className="px-3 py-2 bg-white rounded-lg text-sm font-medium text-surface-700 border border-emerald-200">
-                              {idx + 1}
-                            </div>
-                          </div>
-                          <div className="flex-1">
-                            <label className="block text-xs font-medium text-surface-600 mb-1">Data</label>
-                            <input
-                              type="date"
-                              value={sessao.data}
-                              onChange={e => {
-                                const newSessoes = [...sessoesAnteriores];
-                                newSessoes[idx].data = e.target.value;
-                                setSessoesAnteriores(newSessoes);
-                              }}
-                              className="w-full px-3 py-2 border border-emerald-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400 bg-white"
-                            />
-                          </div>
-                          <div className="flex-1">
-                            <label className="block text-xs font-medium text-surface-600 mb-1">Médico</label>
-                            {isOutroMedico || sessao.medico_nome === 'OUTRO' ? (
-                              <div className="flex gap-1">
-                                <input
-                                  type="text"
-                                  value={sessao.medico_nome === 'OUTRO' ? '' : sessao.medico_nome}
-                                  onChange={e => {
-                                    const newSessoes = [...sessoesAnteriores];
-                                    newSessoes[idx].medico_nome = e.target.value;
-                                    setSessoesAnteriores(newSessoes);
-                                  }}
-                                  placeholder="Digite o nome do médico"
-                                  autoFocus
-                                  className="flex-1 px-3 py-2 border border-emerald-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400 bg-white"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const newSessoes = [...sessoesAnteriores];
-                                    newSessoes[idx].medico_nome = '';
-                                    setSessoesAnteriores(newSessoes);
-                                  }}
-                                  className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded text-xs hover:bg-emerald-200"
-                                  title="Voltar para lista"
-                                >
-                                  Lista
-                                </button>
-                              </div>
-                            ) : (
-                              <select
-                                value={sessao.medico_nome}
-                                onChange={e => {
-                                  const newSessoes = [...sessoesAnteriores];
-                                  newSessoes[idx].medico_nome = e.target.value;
-                                  setSessoesAnteriores(newSessoes);
-                                }}
-                                className="w-full px-3 py-2 border border-emerald-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400 bg-white"
-                              >
-                                <option value="">Selecione o médico...</option>
-                                {doctorsList.map(doc => (
-                                  <option key={doc.crm} value={doc.name}>
-                                    {doc.name}
-                                  </option>
-                                ))}
-                                <option value="OUTRO">Outro (digitar)</option>
-                              </select>
-                            )}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const newSessoes = sessoesAnteriores.filter((_, i) => i !== idx);
-                              setSessoesAnteriores(newSessoes);
-                            }}
-                            className="px-3 py-2 bg-red-100 text-red-700 rounded-lg text-sm font-medium hover:bg-red-200 transition-colors"
-                          >
-                            X
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Data da Próxima Sessão */}
-                <div className="mt-4">
-                  <label className="block text-xs font-medium text-surface-600 mb-1">Data da Próxima Sessão (Opcional)</label>
-                  <input
-                    type="date"
-                    value={cadastroProximaSessao}
-                    onChange={e => setCadastroProximaSessao(e.target.value)}
-                    className="w-full sm:w-64 px-3 py-2 border border-emerald-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400 bg-white"
-                  />
-                </div>
-              </div>
 
               <div className="flex items-center gap-3 pt-4">
                 <button onClick={handleCriarPaciente} disabled={salvandoPaciente}
                   className="px-5 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 transition-colors">
                   {salvandoPaciente ? 'Salvando...' : 'Cadastrar e Iniciar Triagem'}
                 </button>
-                <button onClick={() => { setShowCadastroPaciente(false); setNovoPaciente({ nome_completo: '', cpf: '', cns: '', data_nascimento: '', sexo: 'F', telefone: '', cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', uf: 'BA' }); setSessoesAnteriores([]); setCadastroProximaSessao(''); }}
+                <button onClick={() => { setShowCadastroPaciente(false); setNovoPaciente({ nome_completo: '', cpf: '', cns: '', data_nascimento: '', sexo: 'F', telefone: '', cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', uf: 'BA' }); }}
                   disabled={salvandoPaciente}
                   className="px-4 py-2 bg-surface-100 text-surface-700 rounded-lg text-sm font-medium hover:bg-surface-200 disabled:opacity-50 transition-colors">Voltar</button>
               </div>
@@ -899,9 +735,9 @@ export default function TriagemPage() {
                   className="text-xs px-3 py-1.5 rounded-lg bg-surface-100 text-surface-600 hover:bg-surface-200 transition-colors">Voltar</button>
               </div>
             </div>
-            {(historico.length > 0 || (pacienteAvulso?.sessoes_anteriores?.length || 0) > 0) && !showHistorico && (
+            {historico.length > 0 && !showHistorico && (
               <div className="mt-2 px-3 py-2 bg-amber-50 rounded-lg text-xs text-amber-700">
-                Paciente com {historico.length} triagem(ns) e {(pacienteAvulso?.sessoes_anteriores?.length || 0)} sessao(es) anterior(es). Dados pre-preenchidos. PA, HGT e data sessao em branco.
+                Paciente com {historico.length} triagem(ns). Dados pre-preenchidos. PA, HGT e data sessao em branco.
               </div>
             )}
           </div>
@@ -1099,9 +935,9 @@ export default function TriagemPage() {
                   </div>
                 </div>
 
-                {(historico.length > 0 || (paciente?.sessoes_anteriores?.length || 0) > 0) && !showHistorico && (
+                {historico.length > 0 && !showHistorico && (
                   <div className="mt-2 px-3 py-2 bg-amber-50 rounded-lg text-xs text-amber-700">
-                    Paciente com {historico.length} triagem(ns) e {(paciente?.sessoes_anteriores?.length || 0)} sessao(es) anterior(es). Dados pre-preenchidos. PA, HGT e data sessao em branco.
+                    Paciente com {historico.length} triagem(ns). Dados pre-preenchidos. PA, HGT e data sessao em branco.
                   </div>
                 )}
               </div>

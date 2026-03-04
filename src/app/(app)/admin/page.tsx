@@ -23,6 +23,8 @@ export default function AdminPage() {
   const [municipios, setMunicipios] = useState<Municipio[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingProf, setEditingProf] = useState<Profissional | null>(null);
+  const [editingUnidade, setEditingUnidade] = useState<Unidade | null>(null);
+  const [editingMunicipio, setEditingMunicipio] = useState<Municipio | null>(null);
   const [showPasswordModal, setShowPasswordModal] = useState<Profissional | null>(null);
   const [generatedPassword, setGeneratedPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -38,6 +40,7 @@ export default function AdminPage() {
     role: 'medico' as UserRole
   });
   const [unidadeForm, setUnidadeForm] = useState({ municipio_id: '', nome: '', cnes: '', endereco: '' });
+  const [unidadeEditForm, setUnidadeEditForm] = useState({ municipio_id: '', nome: '', cnes: '', endereco: '' });
   const [munForm, setMunForm] = useState({ nome: '', codigo_ibge: '', uf: 'BA' });
 
   // Role guard - redirect if not admin
@@ -106,6 +109,8 @@ export default function AdminPage() {
       crm: profForm.crm,
       cbo: profForm.cbo,
       role: profForm.role,
+      cpf: profForm.cpf || null,
+      cns: profForm.cns || null,
     };
 
     setLoading(true);
@@ -252,6 +257,98 @@ export default function AdminPage() {
     }
   }
 
+  function startEditingUnidade(u: Unidade) {
+    setEditingUnidade(u);
+    setUnidadeEditForm({
+      municipio_id: u.municipio_id || '',
+      nome: u.nome || '',
+      cnes: u.cnes || '',
+      endereco: u.endereco || '',
+    });
+    setTab('unidades');
+    setShowForm(false);
+  }
+
+  async function editUnidade() {
+    if (!editingUnidade) return;
+
+    const updateData = {
+      municipio_id: unidadeEditForm.municipio_id,
+      nome: unidadeEditForm.nome,
+      cnes: unidadeEditForm.cnes,
+      endereco: unidadeEditForm.endereco,
+    };
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('unidades')
+        .update(updateData)
+        .eq('id', editingUnidade.id);
+
+      if (error) throw error;
+
+      toast.success('Unidade atualizada com sucesso');
+      setEditingUnidade(null);
+      setUnidadeEditForm({ municipio_id: '', nome: '', cnes: '', endereco: '' });
+      loadData();
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao atualizar unidade');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function cancelEditUnidade() {
+    setEditingUnidade(null);
+    setUnidadeEditForm({ municipio_id: '', nome: '', cnes: '', endereco: '' });
+  }
+
+  function startEditingMunicipio(m: Municipio) {
+    setEditingMunicipio(m);
+    setMunForm({
+      nome: m.nome || '',
+      codigo_ibge: m.codigo_ibge || '',
+      uf: m.uf || 'BA',
+    });
+    setTab('municipios');
+    setShowForm(false);
+  }
+
+  async function editMunicipio() {
+    if (!editingMunicipio) return;
+
+    const updateData = {
+      nome: munForm.nome,
+      codigo_ibge: munForm.codigo_ibge,
+      uf: munForm.uf,
+    };
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('municipios')
+        .update(updateData)
+        .eq('id', editingMunicipio.id);
+
+      if (error) throw error;
+
+      toast.success('Municipio atualizado com sucesso');
+      setEditingMunicipio(null);
+      setMunForm({ nome: '', codigo_ibge: '', uf: 'BA' });
+      loadData();
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao atualizar municipio');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function cancelEditMunicipio() {
+    setEditingMunicipio(null);
+    setMunForm({ nome: '', codigo_ibge: '', uf: 'BA' });
+  }
+
   function toggleProfissional(prof: Profissional) {
     confirm({
       title: prof.ativo ? 'Desativar Profissional' : 'Ativar Profissional',
@@ -279,9 +376,18 @@ export default function AdminPage() {
         title="Administracao"
         subtitle="Gestao de profissionais, unidades e municipios"
         action={
-          editingProf ? (
+          editingProf || editingUnidade || editingMunicipio ? (
             <div className="flex gap-2">
-              <button onClick={cancelEdit} className="btn-secondary text-sm">Cancelar Edicao</button>
+              <button
+                onClick={() => {
+                  cancelEdit();
+                  cancelEditUnidade();
+                  cancelEditMunicipio();
+                }}
+                className="btn-secondary text-sm"
+              >
+                Cancelar Edicao
+              </button>
             </div>
           ) : (
             <button onClick={() => setShowForm(true)} className="btn-primary text-sm">+ Novo Cadastro</button>
@@ -297,6 +403,8 @@ export default function AdminPage() {
               setTab(t.key);
               setShowForm(false);
               if (editingProf) cancelEdit();
+              if (editingUnidade) cancelEditUnidade();
+              if (editingMunicipio) cancelEditMunicipio();
             }}
             className={cn(
               'px-4 py-2 rounded-lg text-sm font-medium transition-all',
@@ -311,19 +419,47 @@ export default function AdminPage() {
       </div>
 
       {/* CREATE/EDIT FORM */}
-      {(showForm || editingProf) && (
+      {(showForm || editingProf || editingUnidade || editingMunicipio) && (
         <div className="card p-6 mb-6">
           {editingProf && (
             <div className="space-y-4">
               <h3 className="font-display font-semibold text-surface-800">Editar Profissional</h3>
-              <p className="text-sm text-surface-600">Email: {editingProf.email}</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="md:col-span-2">
+                  <label className="input-label">E-mail</label>
+                  <input
+                    type="email"
+                    value={profForm.email}
+                    disabled
+                    className="input-field opacity-50 cursor-not-allowed"
+                  />
+                  <p className="text-xs text-surface-500 mt-1">Email nao pode ser alterado</p>
+                </div>
                 <div className="md:col-span-2">
                   <label className="input-label">Nome Completo</label>
                   <input
                     type="text"
                     value={profForm.nome_completo}
                     onChange={(e) => setProfForm({ ...profForm, nome_completo: e.target.value })}
+                    className="input-field"
+                  />
+                </div>
+                <div>
+                  <label className="input-label">CPF</label>
+                  <input
+                    type="text"
+                    value={profForm.cpf}
+                    onChange={(e) => setProfForm({ ...profForm, cpf: e.target.value })}
+                    className="input-field"
+                    placeholder="000.000.000-00"
+                  />
+                </div>
+                <div>
+                  <label className="input-label">CNS</label>
+                  <input
+                    type="text"
+                    value={profForm.cns}
+                    onChange={(e) => setProfForm({ ...profForm, cns: e.target.value })}
                     className="input-field"
                   />
                 </div>
@@ -365,6 +501,104 @@ export default function AdminPage() {
                 <button onClick={cancelEdit} className="btn-secondary">Cancelar</button>
                 <button onClick={editProfissional} disabled={loading} className="btn-primary">
                   {loading ? 'Atualizando...' : 'Atualizar Profissional'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {editingUnidade && (
+            <div className="space-y-4">
+              <h3 className="font-display font-semibold text-surface-800">Editar Unidade</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="input-label">Municipio</label>
+                  <select
+                    value={unidadeEditForm.municipio_id}
+                    onChange={(e) => setUnidadeEditForm({ ...unidadeEditForm, municipio_id: e.target.value })}
+                    className="input-field"
+                  >
+                    <option value="">Selecione...</option>
+                    {municipios.map(m => (
+                      <option key={m.id} value={m.id}>{m.nome}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="input-label">CNES</label>
+                  <input
+                    type="text"
+                    value={unidadeEditForm.cnes}
+                    onChange={(e) => setUnidadeEditForm({ ...unidadeEditForm, cnes: e.target.value })}
+                    className="input-field"
+                    maxLength={7}
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="input-label">Nome da Unidade</label>
+                  <input
+                    type="text"
+                    value={unidadeEditForm.nome}
+                    onChange={(e) => setUnidadeEditForm({ ...unidadeEditForm, nome: e.target.value })}
+                    className="input-field"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="input-label">Endereco</label>
+                  <input
+                    type="text"
+                    value={unidadeEditForm.endereco}
+                    onChange={(e) => setUnidadeEditForm({ ...unidadeEditForm, endereco: e.target.value })}
+                    className="input-field"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button onClick={cancelEditUnidade} className="btn-secondary">Cancelar</button>
+                <button onClick={editUnidade} disabled={loading} className="btn-primary">
+                  {loading ? 'Atualizando...' : 'Atualizar Unidade'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {editingMunicipio && (
+            <div className="space-y-4">
+              <h3 className="font-display font-semibold text-surface-800">Editar Municipio</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="input-label">Nome</label>
+                  <input
+                    type="text"
+                    value={munForm.nome}
+                    onChange={(e) => setMunForm({ ...munForm, nome: e.target.value })}
+                    className="input-field"
+                  />
+                </div>
+                <div>
+                  <label className="input-label">Codigo IBGE</label>
+                  <input
+                    type="text"
+                    value={munForm.codigo_ibge}
+                    onChange={(e) => setMunForm({ ...munForm, codigo_ibge: e.target.value })}
+                    className="input-field"
+                    maxLength={7}
+                  />
+                </div>
+                <div>
+                  <label className="input-label">UF</label>
+                  <input
+                    type="text"
+                    value={munForm.uf}
+                    onChange={(e) => setMunForm({ ...munForm, uf: e.target.value })}
+                    className="input-field"
+                    maxLength={2}
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button onClick={cancelEditMunicipio} className="btn-secondary">Cancelar</button>
+                <button onClick={editMunicipio} disabled={loading} className="btn-primary">
+                  {loading ? 'Atualizando...' : 'Atualizar Municipio'}
                 </button>
               </div>
             </div>
@@ -465,7 +699,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {tab === 'unidades' && !editingProf && (
+          {tab === 'unidades' && !editingProf && !editingUnidade && (
             <div className="space-y-4">
               <h3 className="font-display font-semibold text-surface-800">Nova Unidade</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -511,7 +745,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {tab === 'municipios' && !editingProf && (
+          {tab === 'municipios' && !editingProf && !editingMunicipio && (
             <div className="space-y-4">
               <h3 className="font-display font-semibold text-surface-800">Novo Municipio</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -689,6 +923,7 @@ export default function AdminPage() {
                     <th className="px-5 py-3 text-left">Unidade</th>
                     <th className="px-5 py-3 text-left">CNES</th>
                     <th className="px-5 py-3 text-center">Status</th>
+                    <th className="px-5 py-3 text-center">Acoes</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -702,6 +937,16 @@ export default function AdminPage() {
                           {u.ativo ? 'Ativo' : 'Inativo'}
                         </span>
                       </td>
+                      <td className="px-5 py-3">
+                        <div className="flex gap-2 justify-center text-xs">
+                          <button
+                            onClick={() => startEditingUnidade(u)}
+                            className="text-blue-600 hover:text-blue-800 font-medium"
+                          >
+                            Editar
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -711,7 +956,7 @@ export default function AdminPage() {
             {/* MOBILE CARDS */}
             <div className="md:hidden space-y-3 p-4">
               {unidades.map(u => (
-                <div key={u.id} className="border border-surface-200 rounded-lg p-4 space-y-2">
+                <div key={u.id} className="border border-surface-200 rounded-lg p-4 space-y-3">
                   <div className="flex justify-between items-start gap-2">
                     <div className="flex-1">
                       <p className="text-xs text-surface-600 mb-1">{(u as any).municipio?.nome}</p>
@@ -724,6 +969,14 @@ export default function AdminPage() {
                   <div>
                     <p className="text-surface-600 text-xs">CNES</p>
                     <p className="font-mono text-surface-800">{u.cnes}</p>
+                  </div>
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      onClick={() => startEditingUnidade(u)}
+                      className="flex-1 btn-sm bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs"
+                    >
+                      Editar
+                    </button>
                   </div>
                 </div>
               ))}
@@ -746,6 +999,7 @@ export default function AdminPage() {
                     <th className="px-5 py-3 text-left">Nome</th>
                     <th className="px-5 py-3 text-left">Codigo IBGE</th>
                     <th className="px-5 py-3 text-left">UF</th>
+                    <th className="px-5 py-3 text-center">Acoes</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -754,6 +1008,16 @@ export default function AdminPage() {
                       <td className="px-5 py-3 font-medium text-surface-800">{m.nome}</td>
                       <td className="px-5 py-3 font-mono text-surface-500">{m.codigo_ibge}</td>
                       <td className="px-5 py-3 text-surface-500">{m.uf}</td>
+                      <td className="px-5 py-3">
+                        <div className="flex gap-2 justify-center text-xs">
+                          <button
+                            onClick={() => startEditingMunicipio(m)}
+                            className="text-blue-600 hover:text-blue-800 font-medium"
+                          >
+                            Editar
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -763,7 +1027,7 @@ export default function AdminPage() {
             {/* MOBILE CARDS */}
             <div className="md:hidden space-y-3 p-4">
               {municipios.map(m => (
-                <div key={m.id} className="border border-surface-200 rounded-lg p-4 space-y-2">
+                <div key={m.id} className="border border-surface-200 rounded-lg p-4 space-y-3">
                   <p className="font-semibold text-surface-800">{m.nome}</p>
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div>
@@ -774,6 +1038,14 @@ export default function AdminPage() {
                       <p className="text-surface-600 text-xs">UF</p>
                       <p className="font-medium text-surface-800">{m.uf}</p>
                     </div>
+                  </div>
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      onClick={() => startEditingMunicipio(m)}
+                      className="flex-1 btn-sm bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs"
+                    >
+                      Editar
+                    </button>
                   </div>
                 </div>
               ))}
