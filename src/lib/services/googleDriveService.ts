@@ -29,7 +29,7 @@ export async function getGoogleDriveToken(): Promise<string | null> {
   const header = { alg: 'RS256', typ: 'JWT' };
   const claims = {
     iss: email,
-    scope: 'https://www.googleapis.com/auth/drive.file',
+    scope: 'https://www.googleapis.com/auth/drive',
     aud: TOKEN_URL,
     exp: now + 3600,
     iat: now,
@@ -90,7 +90,7 @@ export async function findOrCreateFolder(
 
   // Buscar pasta existente
   const query = `name='${name}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
-  const searchUrl = `${DRIVE_API}?q=${encodeURIComponent(query)}&fields=files(id,name)`;
+  const searchUrl = `${DRIVE_API}?q=${encodeURIComponent(query)}&fields=files(id,name)&supportsAllDrives=true&includeItemsFromAllDrives=true`;
 
   const searchRes = await fetch(searchUrl, {
     headers: { Authorization: `Bearer ${token}` },
@@ -106,7 +106,7 @@ export async function findOrCreateFolder(
   }
 
   // Criar pasta
-  const createRes = await fetch(DRIVE_API, {
+  const createRes = await fetch(`${DRIVE_API}?supportsAllDrives=true`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -180,7 +180,7 @@ export async function uploadFileToDrive(
 
   const body = bodyParts.join('');
 
-  const res = await fetch(`${UPLOAD_API}?uploadType=multipart&fields=id,webViewLink`, {
+  const res = await fetch(`${UPLOAD_API}?uploadType=multipart&fields=id,webViewLink&supportsAllDrives=true`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
