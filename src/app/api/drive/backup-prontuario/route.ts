@@ -1,17 +1,15 @@
 // ============================================================
 // API Route: POST /api/drive/backup-prontuario
-// Gera PDF do prontuário e faz upload ao Google Drive
+// Gera PDF do prontuário e faz upload ao Supabase Storage
 // Chamado de forma assíncrona após finalização do atendimento
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { gerarPDFProntuario } from '@/lib/services/pdfProntuarioService';
-import {
-  getGoogleDriveToken,
-  ensureFolderPath,
-  uploadFileToDrive,
-} from '@/lib/services/googleDriveService';
+
+const BUCKET = 'prontuarios';
 
 // Relações carregadas no SELECT do atendimento
 const ATENDIMENTO_SELECT = `
@@ -34,18 +32,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ---------- 1. Verificar credenciais Google ----------
-    const token = await getGoogleDriveToken();
-    if (!token) {
-      // Sem credenciais → retorna silenciosamente (feature desabilitada)
-      return NextResponse.json({
-        success: false,
-        error: 'Google Drive não configurado',
-        skipped: true,
-      });
-    }
-
-    // ---------- 2. Autenticação do usuário ----------
+    // ---------- 1. Autenticação do usuário ----------
     const supabase = createServerSupabase();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -55,7 +42,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ---------- 3. Buscar atendimento completo ----------
+    // ---------- 2. Buscar atendimento completo ----------
     const { data: atendimento, error: atendError } = await supabase
       .from('atendimentos')
       .select(ATENDIMENTO_SELECT)
@@ -63,35 +50,29 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (atendError || !atendimento) {
-      console.error('[DriveBackup] Atendimento não encontrado:', atendError?.message);
+      console.error('[Backup] Atendimento não encontrado:', atendError?.message);
       return NextResponse.json(
         { success: false, error: 'Atendimento não encontrado' },
         { status: 404 }
       );
     }
 
-    // ---------- 4. Gerar PDF ----------
-    console.log(`[DriveBackup] Gerando PDF para atendimento ${atendimentoId}...`);
+    // ---------- 3. Gerar PDF ----------
+    console.log(`[Backup] Gerando PDF para atendimento ${atendimentoId}...`);
     const pdfBuffer = await gerarPDFProntuario(atendimento);
 
-    // ---------- 5. Montar estrutura de pastas ----------
-    // Inovamed > Prontuarios > 2026-03 > Conceicao do Coite
+    // ---------- 4. Montar caminho do arquivo ----------
+    // prontuarios/2026-03/Conceicao_do_Coite/NOME_PACIENTE_001_20260303.pdf
     const dataAtend = atendimento.data_atendimento || new Date().toISOString().slice(0, 10);
     const anoMes = dataAtend.slice(0, 7); // YYYY-MM
     const municipioNome = atendimento.unidade?.municipio?.nome || 'Sem_Municipio';
-    // Remover acentos e caracteres especiais do nome do município
     const municipioClean = municipioNome
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .replace(/[^a-zA-Z0-9 ]/g, '')
+      .replace(/\s+/g, '_')
       .trim();
 
-    const folderPath = ['Inovamed', 'Prontuarios', anoMes, municipioClean];
-
-    console.log(`[DriveBackup] Criando pastas: ${folderPath.join(' > ')}`);
-    const folderId = await ensureFolderPath(token, folderPath);
-
-    // ---------- 6. Nome do arquivo ----------
     const pacienteNome = (atendimento.paciente?.nome_completo || 'PACIENTE')
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
@@ -102,36 +83,57 @@ export async function POST(request: NextRequest) {
     const dataCompacta = dataAtend.replace(/-/g, '');
     const filename = `${pacienteNome}_${ficha}_${dataCompacta}.pdf`;
 
-    // ---------- 7. Upload ----------
-    console.log(`[DriveBackup] Upload: ${filename} → pasta ${municipioClean}`);
-    const { fileId, webViewLink } = await uploadFileToDrive(
-      token,
-      folderId,
-      filename,
-      pdfBuffer
-    );
+    const storagePath = `${anoMes}/${municipioClean}/${filename}`;
 
-    // ---------- 8. Salvar link no atendimento ----------
+    // ---------- 5. Upload para Supabase Storage ----------
+    // Usar service_role para bypass de RLS
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+    const adminClient = createClient(supabaseUrl, serviceRoleKey);
+
+    console.log(`[Backup] Upload: ${storagePath}`);
+    const { data: uploadData, error: uploadError } = await adminClient.storage
+      .from(BUCKET)
+      .upload(storagePath, pdfBuffer, {
+        contentType: 'application/pdf',
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.error('[Backup] Erro no upload:', uploadError.message);
+      return NextResponse.json(
+        { success: false, error: `Upload falhou: ${uploadError.message}` },
+        { status: 500 }
+      );
+    }
+
+    // ---------- 6. Gerar URL pública ----------
+    const { data: publicUrlData } = adminClient.storage
+      .from(BUCKET)
+      .getPublicUrl(storagePath);
+
+    const publicUrl = publicUrlData?.publicUrl || '';
+
+    // ---------- 7. Salvar URL no atendimento ----------
     const { error: updateError } = await supabase
       .from('atendimentos')
-      .update({ drive_url: webViewLink })
+      .update({ drive_url: publicUrl })
       .eq('id', atendimentoId);
 
     if (updateError) {
-      console.warn('[DriveBackup] Falha ao salvar drive_url:', updateError.message);
-      // Não é crítico - o upload já foi feito
+      console.warn('[Backup] Falha ao salvar URL:', updateError.message);
     }
 
-    console.log(`[DriveBackup] Sucesso! File ID: ${fileId}`);
+    console.log(`[Backup] Sucesso! ${storagePath}`);
 
     return NextResponse.json({
       success: true,
-      drive_url: webViewLink,
-      file_id: fileId,
+      drive_url: publicUrl,
       filename,
+      path: storagePath,
     });
   } catch (error: any) {
-    console.error('[DriveBackup] Erro:', error.message || error);
+    console.error('[Backup] Erro:', error.message || error);
     return NextResponse.json(
       { success: false, error: error.message || 'Erro interno no backup' },
       { status: 500 }
