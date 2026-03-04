@@ -60,6 +60,7 @@ export default function TriagemPage() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [medicos, setMedicos] = useState<Profissional[]>([]);
+  const [procedimentos, setProcedimentos] = useState<any[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
 
   // Nova triagem avulsa
@@ -98,6 +99,7 @@ export default function TriagemPage() {
     if (selectedUnidade) {
       loadFila();
       atendimentoService.getMedicos().then(setMedicos);
+      agendamentoService.getProcedimentos().then(setProcedimentos);
       // Realtime
       const channel = supabase
         .channel('triagem-rt')
@@ -221,10 +223,13 @@ export default function TriagemPage() {
       // Create agendamento if data_proxima_sessao is set
       if (form.data_proxima_sessao) {
         try {
+          // Use bilateral as default procedimento, fallback to first available
+          const defaultProc = procedimentos.find(p => p.tipo === 'bilateral') || procedimentos[0];
           await agendamentoService.createAgendamento({
             empresa_id: selectedEmpresa?.id,
             unidade_id: selectedUnidade.id,
             paciente_id: pacienteAvulso.id,
+            procedimento_id: defaultProc?.id,
             data_agendamento: form.data_proxima_sessao,
             horario_inicio: '08:00',
             horario_fim: '09:00',
@@ -324,10 +329,12 @@ export default function TriagemPage() {
       // Create agendamento if data_proxima_sessao is set (independent of above)
       if (form.data_proxima_sessao) {
         try {
+          const defaultProc = procedimentos.find(p => p.tipo === 'bilateral') || procedimentos[0];
           const agendPayload: Record<string, any> = {
             empresa_id: selectedEmpresa?.id,
             unidade_id: selectedUnidade.id,
             paciente_id: selectedAtend.paciente_id,
+            procedimento_id: selectedAtend.procedimento_id || defaultProc?.id,
             data_agendamento: form.data_proxima_sessao,
             horario_inicio: '08:00',
             horario_fim: '09:00',
@@ -336,7 +343,6 @@ export default function TriagemPage() {
             observacoes: '[SESSAO] Agendado via triagem',
           };
           if (selectedAtend.profissional_id) agendPayload.profissional_id = selectedAtend.profissional_id;
-          if (selectedAtend.procedimento_id) agendPayload.procedimento_id = selectedAtend.procedimento_id;
           await agendamentoService.createAgendamento(agendPayload);
           toast.success(`Agendamento criado para ${formatDate(form.data_proxima_sessao)}`);
         } catch (e: any) {
