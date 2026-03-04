@@ -1,6 +1,6 @@
 // ============================================================
 // Google Drive Service - Backup de Prontuários
-// Usa Service Account (mesmo padrão do export-sheets)
+// Usa OAuth 2.0 com Refresh Token (conta pessoal do Roberto)
 // ============================================================
 
 const DRIVE_API = 'https://www.googleapis.com/drive/v3/files';
@@ -10,69 +10,53 @@ const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 // Cache de IDs de pastas para evitar chamadas repetidas
 const folderCache = new Map<string, string>();
 
+// Cache do access token (válido ~1h)
+let cachedAccessToken: string | null = null;
+let tokenExpiresAt = 0;
+
 /**
- * Gera access token via JWT (Service Account)
+ * Obtém access token via OAuth 2.0 Refresh Token
  * Scope: drive.file (acessa apenas arquivos criados pelo app)
  */
 export async function getGoogleDriveToken(): Promise<string | null> {
-  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  const privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
+  const refreshToken = process.env.GOOGLE_OAUTH_REFRESH_TOKEN;
 
-  if (!email || !privateKey) {
-    console.warn('[GoogleDrive] Credenciais não configuradas. Backup ignorado.');
+  if (!clientId || !clientSecret || !refreshToken) {
+    console.warn('[GoogleDrive] Credenciais OAuth não configuradas. Backup ignorado.');
     return null;
   }
 
-  const crypto = require('crypto');
-  const now = Math.floor(Date.now() / 1000);
-
-  const header = { alg: 'RS256', typ: 'JWT' };
-  const claims = {
-    iss: email,
-    scope: 'https://www.googleapis.com/auth/drive',
-    aud: TOKEN_URL,
-    exp: now + 3600,
-    iat: now,
-  };
-
-  const b64 = (obj: any) =>
-    Buffer.from(JSON.stringify(obj))
-      .toString('base64')
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=/g, '');
-
-  const encodedHeader = b64(header);
-  const encodedClaims = b64(claims);
-  const signInput = `${encodedHeader}.${encodedClaims}`;
-
-  const sign = crypto.createSign('SHA256');
-  sign.update(signInput);
-  const signature = sign
-    .sign(privateKey, 'base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=/g, '');
-
-  const jwt = `${signInput}.${signature}`;
+  // Retorna token em cache se ainda válido (margem de 5 min)
+  if (cachedAccessToken && Date.now() < tokenExpiresAt - 300000) {
+    return cachedAccessToken;
+  }
 
   const res = await fetch(TOKEN_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-      assertion: jwt,
+      grant_type: 'refresh_token',
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
     }),
   });
 
   if (!res.ok) {
     const err = await res.text();
-    console.error('[GoogleDrive] Falha no token:', err);
+    console.error('[GoogleDrive] Falha ao renovar token:', err);
+    cachedAccessToken = null;
     return null;
   }
 
   const data = await res.json();
-  return data.access_token;
+  cachedAccessToken = data.access_token;
+  tokenExpiresAt = Date.now() + (data.expires_in || 3600) * 1000;
+
+  console.log('[GoogleDrive] Access token renovado com sucesso.');
+  return cachedAccessToken;
 }
 
 /**
