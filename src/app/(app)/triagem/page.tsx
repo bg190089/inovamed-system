@@ -1,14 +1,16 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSupabase } from '@/hooks/useSupabase';
 import { AtendimentoService, TriagemService, AgendamentoService, PacienteService } from '@/lib/services';
+import type { EscalaDoDia } from '@/lib/services/agendamentoService';
 import type { Triagem } from '@/lib/services/triagemService';
 import { toast } from 'sonner';
 import { formatDate, calcularIdade, cn, maskCPF, maskPhone } from '@/lib/utils';
 import { PageHeader } from '@/components/ui';
 import type { Atendimento, Profissional } from '@/types';
+import SignatureCanvas from 'react-signature-canvas';
 
 interface TriagemForm {
   alergia: string;
@@ -78,6 +80,14 @@ export default function TriagemPage() {
     sexo: 'F' as 'F' | 'M', telefone: '', cep: '', logradouro: '',
     numero: '', complemento: '', bairro: '', cidade: '', uf: 'BA',
   });
+
+  // TCLE (Termo de Consentimento)
+  const [showTcle, setShowTcle] = useState(false);
+  const [tclePaciente, setTclePaciente] = useState<any>(null);
+  const [tcleEnviando, setTcleEnviando] = useState(false);
+  const [tcleMedico, setTcleMedico] = useState<{ nome: string; crm: string } | null>(null);
+  const [tcleIp, setTcleIp] = useState('');
+  const sigCanvasRef = useRef<SignatureCanvas | null>(null);
 
   // Load queue of patients waiting for triage
   const loadFila = useCallback(async () => {
@@ -206,6 +216,136 @@ export default function TriagemPage() {
     } finally { setSalvandoPaciente(false); }
   }
 
+  // ---------- TCLE Helpers ----------
+  async function abrirTcle(pacienteData: any) {
+    setTclePaciente(pacienteData);
+
+    // Capturar IP
+    try {
+      const res = await fetch('/api/ip');
+      const data = await res.json();
+      setTcleIp(data.ip || '');
+    } catch { setTcleIp(''); }
+
+    // Buscar médico do dia via escala
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const municipioNome = (selectedUnidade as any)?.municipio?.nome || '';
+      if (municipioNome) {
+        const escala = await agendamentoService.getEscalaDoDia(today, municipioNome);
+        if (escala.length > 0) {
+          // Buscar CRM do profissional
+          const profId = escala[0].profissional_id;
+          let crm = '';
+          if (profId) {
+            const { data: prof } = await supabase
+              .from('profissionais')
+              .select('crm')
+              .eq('id', profId)
+              .maybeSingle();
+            crm = prof?.crm || '';
+          }
+          setTcleMedico({ nome: escala[0].medico_nome_formal, crm });
+        } else {
+          setTcleMedico(null);
+        }
+      } else {
+        setTcleMedico(null);
+      }
+    } catch { setTcleMedico(null); }
+
+    setShowTcle(true);
+  }
+
+  async function handleAssinarTcle() {
+    if (!sigCanvasRef.current || sigCanvasRef.current.isEmpty()) {
+      toast.error('Assinatura do paciente é obrigatória');
+      return;
+    }
+    if (!tclePaciente) return;
+
+    setTcleEnviando(true);
+    try {
+      const assinaturaBase64 = sigCanvasRef.current.toDataURL('image/png');
+
+      // Montar endereço
+      const pac = tclePaciente;
+      let endereco = '';
+      if (pac.logradouro) {
+        endereco = pac.logradouro;
+        if (pac.numero) endereco += `, ${pac.numero}`;
+        if (pac.bairro) endereco += ` - ${pac.bairro}`;
+        if (pac.cidade) endereco += ` - ${pac.cidade}`;
+        if (pac.uf) endereco += `/${pac.uf}`;
+      }
+
+      // Buscar dados do profissional logado (triador/testemunha)
+      let triadorNome = user?.email || 'Profissional';
+      let triadorCpf = '';
+      if (user?.id) {
+        const { data: profTriador } = await supabase
+          .from('profissionais')
+          .select('nome_completo, cpf')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        if (profTriador) {
+          triadorNome = profTriador.nome_completo;
+          triadorCpf = profTriador.cpf || '';
+        }
+      }
+
+      // Empresa
+      const empresaNome = selectedEmpresa?.tipo === 'mj' ? 'M&J SERVICOS MEDICOS' : 'INOVAMED';
+
+      const payload = {
+        paciente_nome: pac.nome_completo,
+        paciente_cpf: pac.cpf || '',
+        paciente_data_nascimento: pac.data_nascimento || '',
+        paciente_sexo: pac.sexo || '',
+        paciente_endereco: endereco,
+        medico_nome: tcleMedico?.nome || '',
+        medico_crm: tcleMedico?.crm || '',
+        triador_nome: triadorNome,
+        triador_cpf: triadorCpf,
+        unidade_nome: selectedUnidade?.nome || '',
+        unidade_cnes: selectedUnidade?.cnes || '',
+        municipio_nome: (selectedUnidade as any)?.municipio?.nome || '',
+        empresa_nome: empresaNome,
+        assinatura_paciente: assinaturaBase64,
+        ip_address: tcleIp,
+      };
+
+      const res = await fetch('/api/drive/upload-tcle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await res.json();
+      if (result.success) {
+        toast.success('TCLE assinado e salvo no Google Drive!');
+      } else {
+        toast.error('Erro ao salvar TCLE: ' + (result.error || 'Erro desconhecido'));
+      }
+    } catch (err: any) {
+      console.error('Erro TCLE:', err);
+      toast.error('Erro ao processar TCLE');
+    } finally {
+      setTcleEnviando(false);
+      setShowTcle(false);
+      setTclePaciente(null);
+      setTcleMedico(null);
+      sigCanvasRef.current?.clear();
+    }
+  }
+
+  function fecharTcleSemAssinar() {
+    setShowTcle(false);
+    setTclePaciente(null);
+    setTcleMedico(null);
+    sigCanvasRef.current?.clear();
+  }
+
   // Salvar triagem avulsa (sem atendimento vinculado)
   async function handleSalvarTriagemAvulsa() {
     if (!pacienteAvulso || !selectedUnidade || !user) return;
@@ -245,10 +385,16 @@ export default function TriagemPage() {
       }
 
       toast.success(`Triagem avulsa salva para ${pacienteAvulso.nome_completo}`);
+
+      // Abrir TCLE para assinatura antes de limpar os dados
+      const pacParaTcle = { ...pacienteAvulso };
       setPacienteAvulso(null);
       setShowNovaTriagem(false);
       setForm(EMPTY_FORM);
       setHistorico([]);
+
+      // Abrir modal TCLE (fire-and-forget no sentido do fluxo da triagem)
+      abrirTcle(pacParaTcle);
     } catch (err: any) {
       toast.error(err.message || 'Erro ao salvar triagem avulsa');
     } finally { setSaving(false); }
@@ -351,10 +497,17 @@ export default function TriagemPage() {
         }
       }
 
+      // Abrir TCLE com dados do paciente antes de limpar
+      const pacParaTcle = selectedAtend.paciente ? { ...selectedAtend.paciente } : null;
       setSelectedAtend(null);
       setForm(EMPTY_FORM);
       setHistorico([]);
       loadFila();
+
+      // Abrir modal TCLE
+      if (pacParaTcle) {
+        abrirTcle(pacParaTcle);
+      }
     } catch (err: any) {
       toast.error(err.message || 'Erro ao salvar triagem');
     } finally { setSaving(false); }
@@ -1004,6 +1157,129 @@ export default function TriagemPage() {
           )}
         </div>
       </div>
+
+      {/* ========== MODAL TCLE ========== */}
+      {showTcle && tclePaciente && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[95vh] overflow-y-auto">
+            {/* Header */}
+            <div className="sticky top-0 z-10 bg-gradient-to-r from-blue-600 to-blue-800 text-white px-6 py-4 rounded-t-2xl">
+              <h2 className="text-lg font-bold">Termo de Consentimento Livre e Esclarecido</h2>
+              <p className="text-blue-100 text-xs mt-0.5">Escleroterapia Ecoguiada com Espuma de Polidocanol</p>
+            </div>
+
+            <div className="px-6 py-4 space-y-4">
+              {/* Dados do Paciente */}
+              <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                <h3 className="text-xs font-bold text-blue-800 mb-1">PACIENTE</h3>
+                <p className="text-sm font-medium text-surface-800">{tclePaciente.nome_completo}</p>
+                <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-surface-600 mt-0.5">
+                  {tclePaciente.cpf && <span>CPF: {maskCPF(tclePaciente.cpf)}</span>}
+                  {tclePaciente.data_nascimento && <span>{calcularIdade(tclePaciente.data_nascimento)} anos</span>}
+                  <span>{tclePaciente.sexo === 'F' ? 'Feminino' : 'Masculino'}</span>
+                </div>
+              </div>
+
+              {/* Médico do Dia */}
+              <div className={cn('rounded-lg p-3 border', tcleMedico ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200')}>
+                <h3 className={cn('text-xs font-bold mb-1', tcleMedico ? 'text-emerald-800' : 'text-amber-800')}>MÉDICO(A) RESPONSÁVEL</h3>
+                {tcleMedico ? (
+                  <p className="text-sm font-medium text-surface-800">
+                    Dr(a). {tcleMedico.nome} {tcleMedico.crm && <span className="text-xs text-surface-500">— CRM/BA {tcleMedico.crm}</span>}
+                  </p>
+                ) : (
+                  <p className="text-sm text-amber-700 italic">Médico não identificado na escala do dia. Campo será preenchido posteriormente.</p>
+                )}
+              </div>
+
+              {/* Resumo do Termo */}
+              <div className="border border-surface-200 rounded-lg p-3 max-h-60 overflow-y-auto bg-surface-50 text-xs text-surface-700 leading-relaxed space-y-2">
+                <p className="font-semibold text-surface-800">Eu, {tclePaciente.nome_completo}, declaro que fui informado(a) de forma clara sobre o procedimento de Escleroterapia Ecoguiada com Espuma de Polidocanol:</p>
+
+                <p><strong>I. DO PROCEDIMENTO</strong> — Injeção de Polidocanol em microespuma nas veias acometidas por varizes/insuficiência venosa crônica, guiada por ultrassom vascular (Doppler), em ambiente ambulatorial.</p>
+
+                <p><strong>II. ALTERNATIVAS TERAPÊUTICAS</strong> — Tratamento conservador, cirurgia convencional, ablação térmica por laser ou radiofrequência.</p>
+
+                <p><strong>III. RISCOS E COMPLICAÇÕES</strong> — Incluindo dor local, flebite, hiperpigmentação, matting, equimoses, reação alérgica, necrose cutânea, TVP, embolia pulmonar, distúrbios visuais transitórios, AVC (extremamente raro).</p>
+
+                <p><strong>III-A. ALTERAÇÕES ESTÉTICAS</strong> — Hiperpigmentação (manchas escuras) possível e relativamente frequente, podendo ser permanente em alguns casos.</p>
+
+                <p><strong>IV. INFORMAÇÕES PRESTADAS</strong> — Declaro que prestei informações verdadeiras sobre meu estado de saúde.</p>
+
+                <p><strong>V. COMPROMISSOS PÓS-PROCEDIMENTO</strong> — Uso de meia elástica, deambulação precoce, evitar sol, retorno para acompanhamento.</p>
+
+                <p><strong>VI. INTERCORRÊNCIAS</strong> — Em caso de evento adverso, procurar equipe médica ou urgência imediatamente.</p>
+
+                <p><strong>VII. AUSÊNCIA DE GARANTIA</strong> — Sem garantia de cura completa, novas sessões podem ser necessárias.</p>
+
+                <p><strong>VIII. REGISTRO DE IMAGENS</strong> — Autorizo registro fotográfico/vídeo para documentação clínica exclusivamente.</p>
+
+                <p><strong>IX. REVOGAÇÃO</strong> — Posso revogar este consentimento antes do início do procedimento.</p>
+
+                <p><strong>X. DECLARAÇÃO FINAL</strong> — Li, compreendi e consinto de forma livre, voluntária e esclarecida com a realização do procedimento.</p>
+
+                <p className="text-[10px] text-surface-400 italic mt-2">
+                  Fundamentação: Resolução CFM nº 2.232/2019 · CEM Arts. 22, 34, 59 · Lei 8.078/1990 · Lei 8.080/1990 · Lei 13.146/2015
+                </p>
+              </div>
+
+              {/* Assinatura */}
+              <div>
+                <h3 className="text-xs font-bold text-surface-700 mb-2">ASSINATURA DO PACIENTE</h3>
+                <p className="text-[10px] text-surface-400 mb-1">Desenhe a assinatura no campo abaixo com o dedo ou mouse:</p>
+                <div className="border-2 border-dashed border-surface-300 rounded-lg bg-white relative">
+                  <SignatureCanvas
+                    ref={sigCanvasRef}
+                    penColor="#1a1a1a"
+                    canvasProps={{
+                      className: 'w-full h-32 rounded-lg',
+                      style: { width: '100%', height: '128px' },
+                    }}
+                  />
+                  <button
+                    onClick={() => sigCanvasRef.current?.clear()}
+                    className="absolute top-1 right-1 px-2 py-0.5 text-[10px] bg-surface-100 text-surface-500 rounded hover:bg-surface-200 transition-colors"
+                  >
+                    Limpar
+                  </button>
+                </div>
+              </div>
+
+              {/* Metadados */}
+              <div className="bg-surface-50 rounded-lg p-2 text-[10px] text-surface-400 flex flex-wrap gap-x-4 gap-y-0.5">
+                <span>Data/Hora: {new Date().toLocaleString('pt-BR')}</span>
+                <span>IP: {tcleIp || 'Capturando...'}</span>
+                <span>Unidade: {selectedUnidade?.nome || ''}</span>
+              </div>
+
+              {/* Botões */}
+              <div className="flex items-center gap-3 pt-2 border-t border-surface-100">
+                <button
+                  onClick={handleAssinarTcle}
+                  disabled={tcleEnviando}
+                  className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                >
+                  {tcleEnviando ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Enviando TCLE...
+                    </span>
+                  ) : (
+                    'Assinar e Enviar TCLE'
+                  )}
+                </button>
+                <button
+                  onClick={fecharTcleSemAssinar}
+                  disabled={tcleEnviando}
+                  className="px-4 py-3 bg-surface-100 text-surface-600 rounded-lg text-sm font-medium hover:bg-surface-200 disabled:opacity-50 transition-colors"
+                >
+                  Pular
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
