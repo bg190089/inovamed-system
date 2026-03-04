@@ -249,6 +249,19 @@ export default function ConsultorioPage() {
       }
       await service.salvarProntuario(atendimentoAtual.id, prontuarioData, finalizar);
       if (finalizar) {
+        // Backup assíncrono no Google Drive (fire-and-forget)
+        fetch('/api/drive/backup-prontuario', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ atendimentoId: atendimentoAtual.id }),
+        })
+          .then((r) => r.json())
+          .then((res) => {
+            if (res.success) {
+              toast.success('Backup do prontuário salvo no Google Drive');
+            }
+          })
+          .catch(() => {});
         toast.success('Atendimento finalizado com sucesso');
         setAtendimentoAtual(null);
         setProntuario({ doppler: '', anamnese: '', descricao_procedimento: '', observacoes: '', receita: '' });

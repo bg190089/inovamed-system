@@ -110,6 +110,7 @@ export interface Atendimento {
   assinatura_medico?: string;
   receita?: string;
   triagem_id?: string;
+  drive_url?: string;
   created_at: string;
   // Relations
   paciente?: Paciente;
