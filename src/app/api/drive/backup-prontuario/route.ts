@@ -17,7 +17,7 @@ import {
 const ATENDIMENTO_SELECT = `
   *,
   paciente:pacientes(*),
-  profissional:profissionais(id, nome_completo, crm, cbo, cns, cns_profissional, assinatura_digital),
+  profissional:profissionais(id, nome_completo, crm, cbo, cns, assinatura_digital),
   procedimento:procedimentos(id, codigo_sus, descricao, tipo),
   unidade:unidades(id, nome, cnes, municipio:municipios(id, nome))
 `;
