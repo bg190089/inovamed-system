@@ -74,7 +74,8 @@ export default function TriagemPage() {
   const [salvandoPaciente, setSalvandoPaciente] = useState(false);
   const [novoPaciente, setNovoPaciente] = useState({
     nome_completo: '', cpf: '', cns: '', data_nascimento: '',
-    sexo: 'F' as 'F' | 'M', telefone: '', cidade: '', uf: 'BA',
+    sexo: 'F' as 'F' | 'M', telefone: '', cep: '', logradouro: '',
+    numero: '', complemento: '', bairro: '', cidade: '', uf: 'BA',
   });
 
   // Load queue of patients waiting for triage
@@ -177,6 +178,7 @@ export default function TriagemPage() {
     try {
       const cpfClean = novoPaciente.cpf.replace(/\D/g, '');
       const telClean = novoPaciente.telefone.replace(/\D/g, '');
+      const cepClean = novoPaciente.cep.replace(/\D/g, '');
       const created = await pacienteService.criar({
         nome_completo: novoPaciente.nome_completo.trim().toUpperCase(),
         cpf: cpfClean || undefined,
@@ -184,6 +186,11 @@ export default function TriagemPage() {
         data_nascimento: novoPaciente.data_nascimento,
         sexo: novoPaciente.sexo,
         telefone: telClean || undefined,
+        cep: cepClean || undefined,
+        logradouro: novoPaciente.logradouro.trim() || undefined,
+        numero: novoPaciente.numero.trim() || undefined,
+        complemento: novoPaciente.complemento.trim() || undefined,
+        bairro: novoPaciente.bairro.trim() || undefined,
         cidade: novoPaciente.cidade.trim() || undefined,
         uf: novoPaciente.uf || 'BA',
       });
@@ -191,7 +198,7 @@ export default function TriagemPage() {
       // Ir direto para triagem do novo paciente
       handleSelectPacienteAvulso(created);
       setShowCadastroPaciente(false);
-      setNovoPaciente({ nome_completo: '', cpf: '', cns: '', data_nascimento: '', sexo: 'F', telefone: '', cidade: '', uf: 'BA' });
+      setNovoPaciente({ nome_completo: '', cpf: '', cns: '', data_nascimento: '', sexo: 'F', telefone: '', cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', uf: 'BA' });
     } catch (err: any) {
       toast.error(err.message || 'Erro ao cadastrar paciente');
     } finally { setSalvandoPaciente(false); }
@@ -476,6 +483,41 @@ export default function TriagemPage() {
                     className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400" />
                 </div>
                 <div>
+                  <label className="block text-xs font-medium text-surface-600 mb-1">CEP</label>
+                  <input type="text" value={novoPaciente.cep}
+                    onChange={e => setNovoPaciente(p => ({ ...p, cep: e.target.value.replace(/\D/g, '').replace(/^(\d{5})(\d)/, '$1-$2').slice(0, 9) }))}
+                    placeholder="00000-000" maxLength={9}
+                    className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400" />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-medium text-surface-600 mb-1">Logradouro</label>
+                  <input type="text" value={novoPaciente.logradouro}
+                    onChange={e => setNovoPaciente(p => ({ ...p, logradouro: e.target.value }))}
+                    placeholder="Rua, Avenida, Travessa..."
+                    className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-surface-600 mb-1">Numero</label>
+                  <input type="text" value={novoPaciente.numero}
+                    onChange={e => setNovoPaciente(p => ({ ...p, numero: e.target.value }))}
+                    placeholder="Nº"
+                    className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-surface-600 mb-1">Complemento</label>
+                  <input type="text" value={novoPaciente.complemento}
+                    onChange={e => setNovoPaciente(p => ({ ...p, complemento: e.target.value }))}
+                    placeholder="Apto, Bloco..."
+                    className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-surface-600 mb-1">Bairro</label>
+                  <input type="text" value={novoPaciente.bairro}
+                    onChange={e => setNovoPaciente(p => ({ ...p, bairro: e.target.value }))}
+                    placeholder="Bairro"
+                    className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400" />
+                </div>
+                <div>
                   <label className="block text-xs font-medium text-surface-600 mb-1">Cidade</label>
                   <input type="text" value={novoPaciente.cidade}
                     onChange={e => setNovoPaciente(p => ({ ...p, cidade: e.target.value }))}
@@ -488,7 +530,7 @@ export default function TriagemPage() {
                   className="px-5 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 transition-colors">
                   {salvandoPaciente ? 'Salvando...' : 'Cadastrar e Iniciar Triagem'}
                 </button>
-                <button onClick={() => { setShowCadastroPaciente(false); setNovoPaciente({ nome_completo: '', cpf: '', cns: '', data_nascimento: '', sexo: 'F', telefone: '', cidade: '', uf: 'BA' }); }}
+                <button onClick={() => { setShowCadastroPaciente(false); setNovoPaciente({ nome_completo: '', cpf: '', cns: '', data_nascimento: '', sexo: 'F', telefone: '', cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', uf: 'BA' }); }}
                   disabled={salvandoPaciente}
                   className="px-4 py-2 bg-surface-100 text-surface-700 rounded-lg text-sm font-medium hover:bg-surface-200 disabled:opacity-50 transition-colors">Voltar</button>
               </div>
