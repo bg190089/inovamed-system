@@ -48,11 +48,61 @@ export default function PacientesPage() {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Cadastro novo paciente
+  const [showCadastro, setShowCadastro] = useState(false);
+  const [salvandoPaciente, setSalvandoPaciente] = useState(false);
+  const [novoPaciente, setNovoPaciente] = useState({
+    nome_completo: '', cpf: '', cns: '', data_nascimento: '',
+    sexo: 'F' as 'F' | 'M', telefone: '', email: '',
+    cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', uf: 'BA',
+  });
+
   // QR Code
   const [showQR, setShowQR] = useState(false);
   const [qrUrl, setQrUrl] = useState('');
   const [qrDataUrl, setQrDataUrl] = useState('');
   const qrChannelRef = useRef<any>(null);
+
+  // Cadastrar novo paciente
+  async function handleCriarPaciente() {
+    if (!novoPaciente.nome_completo.trim()) { toast.error('Nome completo e obrigatorio'); return; }
+    if (!novoPaciente.data_nascimento) { toast.error('Data de nascimento e obrigatoria'); return; }
+    setSalvandoPaciente(true);
+    try {
+      const cpfClean = novoPaciente.cpf.replace(/\D/g, '');
+      const telClean = novoPaciente.telefone.replace(/\D/g, '');
+      const cepClean = novoPaciente.cep.replace(/\D/g, '');
+      const created = await pacienteService.criar({
+        nome_completo: novoPaciente.nome_completo.trim().toUpperCase(),
+        cpf: cpfClean || undefined,
+        cns: novoPaciente.cns.trim() || undefined,
+        data_nascimento: novoPaciente.data_nascimento,
+        sexo: novoPaciente.sexo,
+        telefone: telClean || undefined,
+        email: novoPaciente.email.trim() || undefined,
+        cep: cepClean || undefined,
+        logradouro: novoPaciente.logradouro.trim() || undefined,
+        numero: novoPaciente.numero.trim() || undefined,
+        complemento: novoPaciente.complemento.trim() || undefined,
+        bairro: novoPaciente.bairro.trim() || undefined,
+        cidade: novoPaciente.cidade.trim() || undefined,
+        uf: novoPaciente.uf || 'BA',
+      });
+      toast.success(`Paciente ${created.nome_completo} cadastrado com sucesso!`);
+      setShowCadastro(false);
+      setNovoPaciente({
+        nome_completo: '', cpf: '', cns: '', data_nascimento: '',
+        sexo: 'F', telefone: '', email: '',
+        cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', uf: 'BA',
+      });
+      // Select the newly created patient
+      selectPaciente(created);
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao cadastrar paciente');
+    } finally {
+      setSalvandoPaciente(false);
+    }
+  }
 
   // Search with debounce
   useEffect(() => {
@@ -299,10 +349,133 @@ export default function PacientesPage() {
 
   return (
     <div className="p-4 lg:p-8 max-w-7xl mx-auto pt-16 lg:pt-0">
-      <PageHeader
-        title="Pacientes"
-        subtitle="Pesquisa e prontuario completo dos pacientes"
-      />
+      <div className="flex items-center justify-between mb-6">
+        <PageHeader
+          title="Pacientes"
+          subtitle="Pesquisa e prontuario completo dos pacientes"
+        />
+        <button
+          onClick={() => { setShowCadastro(true); setSelectedPaciente(null); }}
+          className="btn-primary text-sm flex items-center gap-2"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
+          Novo Paciente
+        </button>
+      </div>
+
+      {/* Cadastro de novo paciente */}
+      {showCadastro && (
+        <div className="card p-5 mb-6 border-2 border-emerald-300 bg-emerald-50/30">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-display font-bold text-surface-900 text-lg flex items-center gap-2">
+              <svg className="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
+              Cadastrar Novo Paciente
+            </h3>
+            <button onClick={() => setShowCadastro(false)} className="text-xs text-surface-400 hover:text-surface-600">Fechar</button>
+          </div>
+
+          {/* Dados Pessoais */}
+          <p className="text-xs font-bold text-emerald-700 uppercase mb-2 flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+            Dados Pessoais
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+            <div className="md:col-span-2">
+              <label className="input-label">Nome Completo *</label>
+              <input type="text" className="input-field" placeholder="Nome completo do paciente" value={novoPaciente.nome_completo} onChange={e => setNovoPaciente(p => ({ ...p, nome_completo: e.target.value }))} />
+            </div>
+            <div>
+              <label className="input-label">Data de Nascimento *</label>
+              <input type="date" className="input-field" value={novoPaciente.data_nascimento} onChange={e => setNovoPaciente(p => ({ ...p, data_nascimento: e.target.value }))} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            <div>
+              <label className="input-label">Sexo *</label>
+              <select className="input-field" value={novoPaciente.sexo} onChange={e => setNovoPaciente(p => ({ ...p, sexo: e.target.value as 'F' | 'M' }))}>
+                <option value="F">Feminino</option>
+                <option value="M">Masculino</option>
+              </select>
+            </div>
+            <div>
+              <label className="input-label">CPF</label>
+              <input type="text" className="input-field" placeholder="000.000.000-00" value={novoPaciente.cpf} onChange={e => setNovoPaciente(p => ({ ...p, cpf: e.target.value }))} />
+            </div>
+            <div>
+              <label className="input-label">CNS</label>
+              <input type="text" className="input-field" placeholder="000 0000 0000 0000" value={novoPaciente.cns} onChange={e => setNovoPaciente(p => ({ ...p, cns: e.target.value }))} />
+            </div>
+            <div>
+              <label className="input-label">Telefone</label>
+              <input type="text" className="input-field" placeholder="(00) 00000-0000" value={novoPaciente.telefone} onChange={e => setNovoPaciente(p => ({ ...p, telefone: e.target.value }))} />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+            <div>
+              <label className="input-label">Email</label>
+              <input type="email" className="input-field" placeholder="email@exemplo.com" value={novoPaciente.email} onChange={e => setNovoPaciente(p => ({ ...p, email: e.target.value }))} />
+            </div>
+          </div>
+
+          {/* Endereço */}
+          <p className="text-xs font-bold text-emerald-700 uppercase mb-2 flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+            Endereco
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            <div>
+              <label className="input-label">CEP</label>
+              <input type="text" className="input-field" placeholder="00000-000" value={novoPaciente.cep} onChange={e => setNovoPaciente(p => ({ ...p, cep: e.target.value }))} />
+            </div>
+            <div className="md:col-span-2">
+              <label className="input-label">Logradouro</label>
+              <input type="text" className="input-field" placeholder="Rua, Av..." value={novoPaciente.logradouro} onChange={e => setNovoPaciente(p => ({ ...p, logradouro: e.target.value }))} />
+            </div>
+            <div>
+              <label className="input-label">Numero</label>
+              <input type="text" className="input-field" placeholder="N°" value={novoPaciente.numero} onChange={e => setNovoPaciente(p => ({ ...p, numero: e.target.value }))} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            <div>
+              <label className="input-label">Complemento</label>
+              <input type="text" className="input-field" placeholder="Apto, Bloco..." value={novoPaciente.complemento} onChange={e => setNovoPaciente(p => ({ ...p, complemento: e.target.value }))} />
+            </div>
+            <div>
+              <label className="input-label">Bairro</label>
+              <input type="text" className="input-field" placeholder="Bairro" value={novoPaciente.bairro} onChange={e => setNovoPaciente(p => ({ ...p, bairro: e.target.value }))} />
+            </div>
+            <div>
+              <label className="input-label">Cidade</label>
+              <input type="text" className="input-field" placeholder="Cidade" value={novoPaciente.cidade} onChange={e => setNovoPaciente(p => ({ ...p, cidade: e.target.value }))} />
+            </div>
+            <div>
+              <label className="input-label">UF</label>
+              <select className="input-field" value={novoPaciente.uf} onChange={e => setNovoPaciente(p => ({ ...p, uf: e.target.value }))}>
+                {['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'].map(uf => (
+                  <option key={uf} value={uf}>{uf}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-2 border-t border-surface-200">
+            <button
+              onClick={handleCriarPaciente}
+              disabled={salvandoPaciente}
+              className="btn-primary flex items-center gap-2"
+            >
+              {salvandoPaciente ? (
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+              )}
+              {salvandoPaciente ? 'Salvando...' : 'Cadastrar Paciente'}
+            </button>
+            <button onClick={() => setShowCadastro(false)} className="btn-secondary">Cancelar</button>
+          </div>
+        </div>
+      )}
 
       {/* Search bar */}
       <div className="card p-4 mb-6">
