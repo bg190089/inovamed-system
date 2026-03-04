@@ -69,6 +69,14 @@ export default function TriagemPage() {
   const [pacienteAvulso, setPacienteAvulso] = useState<any>(null);
   const [buscando, setBuscando] = useState(false);
 
+  // Cadastro de novo paciente inline
+  const [showCadastroPaciente, setShowCadastroPaciente] = useState(false);
+  const [salvandoPaciente, setSalvandoPaciente] = useState(false);
+  const [novoPaciente, setNovoPaciente] = useState({
+    nome_completo: '', cpf: '', cns: '', data_nascimento: '',
+    sexo: 'F' as 'F' | 'M', telefone: '', cidade: '', uf: 'BA',
+  });
+
   // Load queue of patients waiting for triage
   const loadFila = useCallback(async () => {
     if (!selectedUnidade) return;
@@ -159,6 +167,34 @@ export default function TriagemPage() {
       }
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
+  }
+
+  // Criar novo paciente e ir direto para triagem
+  async function handleCriarPaciente() {
+    if (!novoPaciente.nome_completo.trim()) { toast.error('Nome completo e obrigatorio'); return; }
+    if (!novoPaciente.data_nascimento) { toast.error('Data de nascimento e obrigatoria'); return; }
+    setSalvandoPaciente(true);
+    try {
+      const cpfClean = novoPaciente.cpf.replace(/\D/g, '');
+      const telClean = novoPaciente.telefone.replace(/\D/g, '');
+      const created = await pacienteService.criar({
+        nome_completo: novoPaciente.nome_completo.trim().toUpperCase(),
+        cpf: cpfClean || undefined,
+        cns: novoPaciente.cns.trim() || undefined,
+        data_nascimento: novoPaciente.data_nascimento,
+        sexo: novoPaciente.sexo,
+        telefone: telClean || undefined,
+        cidade: novoPaciente.cidade.trim() || undefined,
+        uf: novoPaciente.uf || 'BA',
+      });
+      toast.success(`Paciente ${created.nome_completo} cadastrado!`);
+      // Ir direto para triagem do novo paciente
+      handleSelectPacienteAvulso(created);
+      setShowCadastroPaciente(false);
+      setNovoPaciente({ nome_completo: '', cpf: '', cns: '', data_nascimento: '', sexo: 'F', telefone: '', cidade: '', uf: 'BA' });
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao cadastrar paciente');
+    } finally { setSalvandoPaciente(false); }
   }
 
   // Salvar triagem avulsa (sem atendimento vinculado)
@@ -326,7 +362,7 @@ export default function TriagemPage() {
           subtitle={`${(selectedUnidade as any)?.municipio?.nome || '—'} • ${formatDate(new Date(), 'dd/MM/yyyy')} • ${fila.length} pacientes aguardando`}
         />
         <button
-          onClick={() => { setShowNovaTriagem(!showNovaTriagem); setSelectedAtend(null); setPacienteAvulso(null); setForm(EMPTY_FORM); setHistorico([]); }}
+          onClick={() => { setShowNovaTriagem(!showNovaTriagem); setSelectedAtend(null); setPacienteAvulso(null); setShowCadastroPaciente(false); setForm(EMPTY_FORM); setHistorico([]); }}
           className="px-4 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors flex items-center gap-2"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
@@ -339,31 +375,123 @@ export default function TriagemPage() {
         <div className="card p-4 mb-6 border-2 border-emerald-200 bg-emerald-50/50">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-bold text-emerald-800">Nova Triagem Avulsa</h3>
-            <button onClick={() => setShowNovaTriagem(false)} className="text-xs text-surface-400 hover:text-surface-600">Fechar</button>
+            <button onClick={() => { setShowNovaTriagem(false); setShowCadastroPaciente(false); }} className="text-xs text-surface-400 hover:text-surface-600">Fechar</button>
           </div>
-          <div className="relative">
-            <input
-              type="text"
-              value={buscaPaciente}
-              onChange={(e) => setBuscaPaciente(e.target.value)}
-              className="w-full px-3 py-2 pl-9 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400"
-              placeholder="Buscar paciente por nome, CPF ou CNS..."
-              autoFocus
-            />
-            <svg className="w-4 h-4 text-surface-400 absolute left-3 top-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-            {buscando && <div className="absolute right-3 top-2.5"><div className="w-4 h-4 border-2 border-emerald-300 border-t-emerald-600 rounded-full animate-spin" /></div>}
+
+          {/* Tabs: Buscar / Cadastrar */}
+          <div className="flex gap-2 mb-3">
+            <button onClick={() => setShowCadastroPaciente(false)}
+              className={cn('px-3 py-1.5 rounded-lg text-xs font-medium transition-colors', !showCadastroPaciente ? 'bg-emerald-600 text-white' : 'bg-surface-100 text-surface-600 hover:bg-surface-200')}>
+              Buscar Paciente
+            </button>
+            <button onClick={() => setShowCadastroPaciente(true)}
+              className={cn('px-3 py-1.5 rounded-lg text-xs font-medium transition-colors', showCadastroPaciente ? 'bg-emerald-600 text-white' : 'bg-surface-100 text-surface-600 hover:bg-surface-200')}>
+              Cadastrar Novo Paciente
+            </button>
           </div>
-          {resultadosBusca.length > 0 && (
-            <div className="mt-2 border border-surface-200 rounded-lg overflow-hidden max-h-48 overflow-y-auto bg-white">
-              {resultadosBusca.map((pac: any) => (
-                <button key={pac.id} onClick={() => handleSelectPacienteAvulso(pac)}
-                  className="w-full text-left px-4 py-2.5 hover:bg-emerald-50 transition-colors border-b border-surface-50 last:border-0">
-                  <p className="text-sm font-medium text-surface-800">{pac.nome_completo}</p>
-                  <p className="text-xs text-surface-400">
-                    CPF: {maskCPF(pac.cpf || '')} | {pac.data_nascimento ? calcularIdade(pac.data_nascimento) + 'a' : ''} | {pac.sexo === 'F' ? 'Fem' : 'Masc'}
-                  </p>
+
+          {!showCadastroPaciente ? (
+            <>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={buscaPaciente}
+                  onChange={(e) => setBuscaPaciente(e.target.value)}
+                  className="w-full px-3 py-2 pl-9 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400"
+                  placeholder="Buscar paciente por nome, CPF ou CNS..."
+                  autoFocus
+                />
+                <svg className="w-4 h-4 text-surface-400 absolute left-3 top-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                {buscando && <div className="absolute right-3 top-2.5"><div className="w-4 h-4 border-2 border-emerald-300 border-t-emerald-600 rounded-full animate-spin" /></div>}
+              </div>
+              {resultadosBusca.length > 0 && (
+                <div className="mt-2 border border-surface-200 rounded-lg overflow-hidden max-h-48 overflow-y-auto bg-white">
+                  {resultadosBusca.map((pac: any) => (
+                    <button key={pac.id} onClick={() => handleSelectPacienteAvulso(pac)}
+                      className="w-full text-left px-4 py-2.5 hover:bg-emerald-50 transition-colors border-b border-surface-50 last:border-0">
+                      <p className="text-sm font-medium text-surface-800">{pac.nome_completo}</p>
+                      <p className="text-xs text-surface-400">
+                        CPF: {maskCPF(pac.cpf || '')} | {pac.data_nascimento ? calcularIdade(pac.data_nascimento) + 'a' : ''} | {pac.sexo === 'F' ? 'Fem' : 'Masc'}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {buscaPaciente.length >= 3 && !buscando && resultadosBusca.length === 0 && (
+                <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-center">
+                  <p className="text-xs text-amber-700 mb-2">Nenhum paciente encontrado para "{buscaPaciente}"</p>
+                  <button onClick={() => { setShowCadastroPaciente(true); setNovoPaciente(p => ({ ...p, nome_completo: buscaPaciente.toUpperCase() })); }}
+                    className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-medium hover:bg-emerald-700 transition-colors">
+                    Cadastrar Novo Paciente
+                  </button>
+                </div>
+              )}
+            </>
+          ) : (
+            /* Formulario de Cadastro de Novo Paciente */
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-medium text-surface-600 mb-1">Nome Completo *</label>
+                  <input type="text" value={novoPaciente.nome_completo}
+                    onChange={e => setNovoPaciente(p => ({ ...p, nome_completo: e.target.value }))}
+                    placeholder="Nome completo do paciente"
+                    className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400 uppercase"
+                    autoFocus />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-surface-600 mb-1">CPF</label>
+                  <input type="text" value={novoPaciente.cpf}
+                    onChange={e => setNovoPaciente(p => ({ ...p, cpf: maskCPF(e.target.value) }))}
+                    placeholder="000.000.000-00" maxLength={14}
+                    className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-surface-600 mb-1">Cartao SUS (CNS)</label>
+                  <input type="text" value={novoPaciente.cns}
+                    onChange={e => setNovoPaciente(p => ({ ...p, cns: e.target.value }))}
+                    placeholder="Numero do Cartao SUS" maxLength={15}
+                    className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-surface-600 mb-1">Data de Nascimento *</label>
+                  <input type="date" value={novoPaciente.data_nascimento}
+                    onChange={e => setNovoPaciente(p => ({ ...p, data_nascimento: e.target.value }))}
+                    className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-surface-600 mb-1">Sexo *</label>
+                  <select value={novoPaciente.sexo}
+                    onChange={e => setNovoPaciente(p => ({ ...p, sexo: e.target.value as 'F' | 'M' }))}
+                    className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400 bg-white">
+                    <option value="F">Feminino</option>
+                    <option value="M">Masculino</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-surface-600 mb-1">Telefone</label>
+                  <input type="text" value={novoPaciente.telefone}
+                    onChange={e => setNovoPaciente(p => ({ ...p, telefone: maskPhone(e.target.value) }))}
+                    placeholder="(00) 00000-0000" maxLength={15}
+                    className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-surface-600 mb-1">Cidade</label>
+                  <input type="text" value={novoPaciente.cidade}
+                    onChange={e => setNovoPaciente(p => ({ ...p, cidade: e.target.value }))}
+                    placeholder="Ex: Santo Estevao"
+                    className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400" />
+                </div>
+              </div>
+              <div className="flex items-center gap-3 pt-2">
+                <button onClick={handleCriarPaciente} disabled={salvandoPaciente}
+                  className="px-5 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 transition-colors">
+                  {salvandoPaciente ? 'Salvando...' : 'Cadastrar e Iniciar Triagem'}
                 </button>
-              ))}
+                <button onClick={() => { setShowCadastroPaciente(false); setNovoPaciente({ nome_completo: '', cpf: '', cns: '', data_nascimento: '', sexo: 'F', telefone: '', cidade: '', uf: 'BA' }); }}
+                  disabled={salvandoPaciente}
+                  className="px-4 py-2 bg-surface-100 text-surface-700 rounded-lg text-sm font-medium hover:bg-surface-200 disabled:opacity-50 transition-colors">Voltar</button>
+              </div>
             </div>
           )}
         </div>
