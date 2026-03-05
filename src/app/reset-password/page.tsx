@@ -2,32 +2,85 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 
 function ResetPasswordContent() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [sessionReady, setSessionReady] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
 
   useEffect(() => {
-    // Check if we have access token from the URL hash
-    const hashParams = new URLSearchParams(window.location.hash.substring(1));
-    const accessToken = hashParams.get('access_token');
+    async function handleAuth() {
+      try {
+        // PKCE flow: Supabase redirects with ?code=xxx
+        const code = searchParams.get('code');
+        if (code) {
+          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+          if (exchangeError) {
+            console.error('Code exchange error:', exchangeError);
+            setError('Link de recuperacao expirado. Por favor, solicite um novo link.');
+            setLoading(false);
+            return;
+          }
+          setSessionReady(true);
+          setLoading(false);
+          return;
+        }
 
-    if (!accessToken) {
-      setError('Link de recuperacao invalido ou expirado. Por favor, solicite um novo link.');
+        // Legacy implicit flow: check for access_token in hash
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const accessToken = hashParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token');
+        const type = hashParams.get('type');
+
+        if (accessToken && type === 'recovery') {
+          const { error: sessionError } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken || '',
+          });
+          if (sessionError) {
+            console.error('Session error:', sessionError);
+            setError('Link de recuperacao expirado. Por favor, solicite um novo link.');
+            setLoading(false);
+            return;
+          }
+          setSessionReady(true);
+          setLoading(false);
+          return;
+        }
+
+        // Also check if there's already a recovery session (onAuthStateChange)
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          setSessionReady(true);
+          setLoading(false);
+          return;
+        }
+
+        // No valid auth method found
+        setError('Link de recuperacao invalido ou expirado. Por favor, solicite um novo link.');
+        setLoading(false);
+      } catch (err: any) {
+        console.error('Auth handling error:', err);
+        setError('Erro ao processar link de recuperacao. Tente novamente.');
+        setLoading(false);
+      }
     }
-  }, []);
+
+    handleAuth();
+  }, [searchParams]);
 
   async function handleResetPassword(e: React.FormEvent) {
     e.preventDefault();
     setError('');
 
-    // Validate passwords
     if (!password || !confirmPassword) {
       setError('Por favor, preencha todos os campos');
       return;
@@ -43,7 +96,7 @@ function ResetPasswordContent() {
       return;
     }
 
-    setLoading(true);
+    setSubmitting(true);
 
     try {
       const { error } = await supabase.auth.updateUser({ password });
@@ -55,16 +108,19 @@ function ResetPasswordContent() {
 
       toast.success('Senha atualizada com sucesso!');
 
-      // Redirect to login after a short delay
+      // Sign out and redirect to login
+      await supabase.auth.signOut();
       setTimeout(() => {
         router.push('/login');
       }, 2000);
     } catch (err: any) {
       setError(err.message || 'Erro ao atualizar senha');
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   }
+
+  const isDisabled = !sessionReady || loading;
 
   return (
     <div className="min-h-screen flex">
@@ -111,55 +167,69 @@ function ResetPasswordContent() {
             Digite sua nova senha para recuperar o acesso
           </p>
 
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 text-sm">
-              {error}
+          {loading && (
+            <div className="flex flex-col items-center justify-center py-12">
+              <div className="w-8 h-8 border-3 border-brand-200 border-t-brand-600 rounded-full animate-spin mb-4" />
+              <p className="text-surface-500">Verificando link de recuperacao...</p>
             </div>
           )}
 
-          <form onSubmit={handleResetPassword} className="space-y-5">
-            <div>
-              <label className="input-label">Nova Senha</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="input-field"
-                placeholder="••••••••"
-                disabled={!!error && error.includes('invalido')}
-                required
-              />
-              <p className="text-xs text-surface-500 mt-1">Minimo 6 caracteres</p>
-            </div>
-
-            <div>
-              <label className="input-label">Confirmar Senha</label>
-              <input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="input-field"
-                placeholder="••••••••"
-                disabled={!!error && error.includes('invalido')}
-                required
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading || (!!error && error.includes('invalido'))}
-              className="btn-primary w-full py-3 text-base"
-            >
-              {loading ? (
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Atualizando...
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 text-sm">
+              {error}
+              {error.includes('expirado') || error.includes('invalido') ? (
+                <div className="mt-3">
+                  <a href="/login" className="inline-block text-brand-600 hover:text-brand-700 font-medium underline">
+                    Voltar ao login e solicitar novo link
+                  </a>
                 </div>
-              ) : (
-                'Atualizar Senha'
-              )}
-            </button>
-          </form>
+              ) : null}
+            </div>
+          )}
+
+          {!loading && sessionReady && (
+            <form onSubmit={handleResetPassword} className="space-y-5">
+              <div>
+                <label className="input-label">Nova Senha</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="input-field"
+                  placeholder="••••••••"
+                  required
+                />
+                <p className="text-xs text-surface-500 mt-1">Minimo 6 caracteres</p>
+              </div>
+
+              <div>
+                <label className="input-label">Confirmar Senha</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="input-field"
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="btn-primary w-full py-3 text-base"
+              >
+                {submitting ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Atualizando...
+                  </div>
+                ) : (
+                  'Atualizar Senha'
+                )}
+              </button>
+            </form>
+          )}
 
           <p className="mt-8 text-center text-sm text-surface-400">
             <a href="/login" className="text-brand-600 hover:text-brand-700 font-medium">
@@ -174,7 +244,14 @@ function ResetPasswordContent() {
 
 export default function ResetPasswordPage() {
   return (
-    <Suspense fallback={<div>Carregando...</div>}>
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-surface-50">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-8 h-8 border-3 border-brand-200 border-t-brand-600 rounded-full animate-spin" />
+          <p className="text-surface-500">Carregando...</p>
+        </div>
+      </div>
+    }>
       <ResetPasswordContent />
     </Suspense>
   );
