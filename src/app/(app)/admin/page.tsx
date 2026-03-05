@@ -364,6 +364,40 @@ export default function AdminPage() {
     });
   }
 
+  function deleteProfissional(prof: Profissional) {
+    confirm({
+      title: 'Excluir Profissional',
+      description: `Tem certeza que deseja excluir permanentemente o cadastro de ${prof.nome_completo}? Esta acao nao pode ser desfeita. Se o profissional possui atendimentos, prefira desativa-lo.`,
+      variant: 'danger',
+      confirmLabel: 'Excluir Permanentemente',
+      onConfirm: async () => {
+        try {
+          const res = await fetch('/api/admin/delete-user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              profissional_id: prof.id,
+              user_id: prof.user_id,
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Erro ao excluir profissional');
+
+          if (data.warning) {
+            toast.warning(data.warning);
+          } else {
+            toast.success('Profissional excluido com sucesso');
+          }
+          loadData();
+          closeConfirm();
+        } catch (err: any) {
+          toast.error(err.message || 'Erro ao excluir profissional');
+          closeConfirm();
+        }
+      },
+    });
+  }
+
   const tabs: { key: AdminTab; label: string }[] = [
     { key: 'profissionais', label: 'Profissionais' },
     { key: 'unidades', label: 'Unidades/CNES' },
@@ -843,6 +877,12 @@ export default function AdminPage() {
                           >
                             {p.ativo ? 'Desativar' : 'Ativar'}
                           </button>
+                          <button
+                            onClick={() => deleteProfissional(p)}
+                            className="text-red-600 hover:text-red-800 font-medium"
+                          >
+                            Excluir
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -899,6 +939,12 @@ export default function AdminPage() {
                       className="flex-1 btn-sm bg-surface-100 text-surface-700 hover:bg-surface-200 text-xs"
                     >
                       {p.ativo ? 'Desativar' : 'Ativar'}
+                    </button>
+                    <button
+                      onClick={() => deleteProfissional(p)}
+                      className="flex-1 btn-sm bg-red-50 text-red-700 hover:bg-red-100 text-xs"
+                    >
+                      Excluir
                     </button>
                   </div>
                 </div>
