@@ -35,6 +35,12 @@ const DEFAULT_TEMPLATES = [
   'Escleroterapia com espuma de polidocanol 1% guiada por Doppler em veia safena magna. Procedimento transcorreu sem complicacoes. Bandagem elastica aplicada. Paciente orientado quanto ao uso de meia elastica.',
 ];
 
+const DEFAULT_DOPPLER_TEMPLATES = [
+  'Doppler venoso de membros inferiores sem sinais de trombose venosa profunda. Veias profundas pervias com fluxo fasico e compressiveis. Sem refluxo em veias safenas.',
+  'Insuficiencia segmentar em veia safena magna bilateralmente, com refluxo identificado ao Doppler. Veias profundas pervias, sem sinais de TVP. Presenca de veias varicosas tributarias em ambos os membros inferiores.',
+];
+
+
 export default function ConsultorioPage() {
   const { user, selectedUnidade } = useAuth();
   const supabase = useSupabase();
@@ -61,11 +67,15 @@ export default function ConsultorioPage() {
 
   // Templates state
   const [templates, setTemplates] = useState<string[]>(DEFAULT_TEMPLATES);
+  const [dopplerTemplates, setDopplerTemplates] = useState<string[]>(DEFAULT_DOPPLER_TEMPLATES)
   const [showTemplateEditor, setShowTemplateEditor] = useState(false);
-  const [activeTab, setActiveTab] = useState<'doppler' | 'procedimento' | 'observacao' | 'receita'>('doppler')
+    const [activeTab, setActiveTab] = useState<'procedimento' | 'observacao' | 'receita'>('procedimento')
   const [editingTemplate, setEditingTemplate] = useState('');
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [newTemplate, setNewTemplate] = useState('');
+  const [editingDopplerTemplate, setEditingDopplerTemplate] = useState('')
+  const [editingDopplerIndex, setEditingDopplerIndex] = useState(-1)
+  const [newDopplerTemplate, setNewDopplerTemplate] = useState('')
 
   // Reload interval for wait times
   const [, setRefreshKey] = useState(0);
@@ -318,6 +328,34 @@ export default function ConsultorioPage() {
 
   function deleteTemplate(index: number) {
     setTemplates(templates.filter((_, i) => i !== index));
+    toast.success('Template removido');
+  }
+function addDopplerTemplate() {
+    if (!newDopplerTemplate.trim()) {
+      toast.error('Template nao pode estar vazio');
+      return;
+    }
+    setDopplerTemplates([...dopplerTemplates, newDopplerTemplate]);
+    setNewDopplerTemplate('');
+    toast.success('Template adicionado');
+  }
+
+  function updateDopplerTemplate() {
+    if (editingIndex === null) return;
+    if (!editingDopplerTemplate.trim()) {
+      toast.error('Template nao pode estar vazio');
+      return;
+    }
+    const updated = [...dopplerTemplates];
+    updated[editingIndex] = editingDopplerTemplate;
+    setDopplerTemplates(updated);
+    setEditingDopplerIndex(null);
+    setEditingDopplerTemplate('');
+    toast.success('Template atualizado');
+  }
+
+  function deleteDopplerTemplate(index: number) {
+    setDopplerTemplates(dopplerTemplates.filter((_, i) => i !== index));
     toast.success('Template removido');
   }
 
@@ -812,96 +850,72 @@ export default function ConsultorioPage() {
 
                 {/* Template Editor Modal */}
                 {showTemplateEditor && (
-                  <div className="p-5 border-b border-surface-100 bg-blue-50 rounded-b-lg">
-                    <h4 className="font-semibold text-surface-800 mb-3 text-sm">Gerenciar Templates</h4>
-
-                    {/* Existing Templates */}
-                    <div className="space-y-2 mb-4 max-h-48 overflow-y-auto">
-                      {templates.map((t, idx) => (
-                        <div
-                          key={idx}
-                          className="flex items-start gap-2 p-2 bg-white rounded-md border border-surface-100 group hover:border-surface-300 transition"
-                        >
-                          <div className="flex-1">
-                            {editingIndex === idx ? (
-                              <textarea
-                                value={editingTemplate}
-                                onChange={(e) => setEditingTemplate(e.target.value)}
-                                className="input-field text-xs resize-none"
-                                rows={3}
-                              />
-                            ) : (
-                              <p className="text-xs text-surface-600 line-clamp-2">{t}</p>
-                            )}
-                          </div>
-                          <div className="flex gap-1 flex-shrink-0">
-                            {editingIndex === idx ? (
-                              <>
-                                <button
-                                  onClick={updateTemplate}
-                                  className="text-[10px] text-emerald-600 bg-emerald-50 px-2 py-1 rounded hover:bg-emerald-100"
-                                >
-                                  Salvar
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setEditingIndex(null);
-                                    setEditingTemplate('');
-                                  }}
-                                  className="text-[10px] text-surface-600 bg-surface-100 px-2 py-1 rounded hover:bg-surface-200"
-                                >
-                                  Cancelar
-                                </button>
-                              </>
-                            ) : (
-                              <>
-                                <button
-                                  onClick={() => {
-                                    setEditingIndex(idx);
-                                    setEditingTemplate(t);
-                                  }}
-                                  className="text-[10px] text-brand-600 bg-brand-50 px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition"
-                                >
-                                  Editar
-                                </button>
-                                <button
-                                  onClick={() => deleteTemplate(idx)}
-                                  className="text-[10px] text-red-600 bg-red-50 px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition"
-                                >
-                                  Deletar
-                                </button>
-                              </>
-                            )}
-                          </div>
+                  <div className="px-5 py-4 border-b border-surface-100 bg-blue-50/50">
+                    <h4 className="font-semibold text-surface-800 mb-4">Gerenciar Templates</h4>
+                    
+                    <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-2">Templates Doppler</p>
+                    <div className="space-y-2 mb-3">
+                      {dopplerTemplates.map((t, i) => (
+                        <div key={'d'+i} className="bg-white rounded-lg border border-surface-200 p-3">
+                          {editingDopplerIndex === i ? (
+                            <div className="space-y-2">
+                              <textarea value={editingDopplerTemplate} onChange={e => setEditingDopplerTemplate(e.target.value)} rows={2} className="w-full px-2 py-1.5 border rounded text-sm" />
+                              <div className="flex gap-2">
+                                <button onClick={() => updateDopplerTemplate(i)} className="text-xs px-2 py-1 bg-brand-600 text-white rounded">Salvar</button>
+                                <button onClick={() => setEditingDopplerIndex(-1)} className="text-xs px-2 py-1 bg-surface-200 rounded">Cancelar</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="text-sm text-surface-600 flex-1 line-clamp-2">{t}</p>
+                              <div className="flex gap-1 shrink-0">
+                                <button onClick={() => { setEditingDopplerIndex(i); setEditingDopplerTemplate(t); }} className="text-xs text-brand-600 hover:underline">Editar</button>
+                                <button onClick={() => deleteDopplerTemplate(i)} className="text-xs text-red-500 hover:underline">Excluir</button>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
+                    <div className="mb-5">
+                      <textarea value={newDopplerTemplate} onChange={e => setNewDopplerTemplate(e.target.value)} placeholder="Novo template de doppler..." rows={2} className="w-full px-2 py-1.5 border rounded text-sm mb-1" />
+                      <button onClick={() => addDopplerTemplate()} className="w-full py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">Adicionar Template Doppler</button>
+                    </div>
 
-                    {/* Add New Template */}
-                    <div className="space-y-2">
-                      <p className="text-xs font-semibold text-surface-600">Adicionar Novo Template</p>
-                      <textarea
-                        value={newTemplate}
-                        onChange={(e) => setNewTemplate(e.target.value)}
-                        className="input-field text-xs resize-none"
-                        rows={3}
-                        placeholder="Digite o novo template..."
-                      />
-                      <button
-                        onClick={addTemplate}
-                        className="btn-primary text-xs w-full"
-                      >
-                        Adicionar Template
-                      </button>
+                    <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-2">Templates Procedimento</p>
+                    <div className="space-y-2 mb-3">
+                      {templates.map((t, i) => (
+                        <div key={'p'+i} className="bg-white rounded-lg border border-surface-200 p-3">
+                          {editingIndex === i ? (
+                            <div className="space-y-2">
+                              <textarea value={editingTemplate} onChange={e => setEditingTemplate(e.target.value)} rows={2} className="w-full px-2 py-1.5 border rounded text-sm" />
+                              <div className="flex gap-2">
+                                <button onClick={() => updateTemplate(i)} className="text-xs px-2 py-1 bg-brand-600 text-white rounded">Salvar</button>
+                                <button onClick={() => setEditingIndex(-1)} className="text-xs px-2 py-1 bg-surface-200 rounded">Cancelar</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="text-sm text-surface-600 flex-1 line-clamp-2">{t}</p>
+                              <div className="flex gap-1 shrink-0">
+                                <button onClick={() => { setEditingIndex(i); setEditingTemplate(t); }} className="text-xs text-brand-600 hover:underline">Editar</button>
+                                <button onClick={() => deleteTemplate(i)} className="text-xs text-red-500 hover:underline">Excluir</button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <div>
+                      <textarea value={newTemplate} onChange={e => setNewTemplate(e.target.value)} placeholder="Novo template de procedimento..." rows={2} className="w-full px-2 py-1.5 border rounded text-sm mb-1" />
+                      <button onClick={() => addTemplate()} className="w-full py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700">Adicionar Template Procedimento</button>
                     </div>
                   </div>
                 )}
 
-                
                 <div className="px-5 pt-3 pb-0">
                   <div className="flex gap-1 border-b border-surface-200">
                     {[
-                      { key: 'doppler', label: 'Doppler' },
                       { key: 'procedimento', label: 'Procedimento' },
                       { key: 'observacao', label: 'Observacao' },
                       { key: 'receita', label: 'Receita' },
@@ -921,49 +935,50 @@ export default function ConsultorioPage() {
                   </div>
                 </div>
                 <div className="p-5">
-                  {activeTab === 'doppler' && (
-                    <div>
-                      <label className="block text-sm font-medium text-surface-700 mb-1.5">Doppler Vascular</label>
-                      <textarea
-                        value={(prontuario as any).doppler}
-                        onChange={e => setProntuario(p => ({ ...p, doppler: e.target.value }))}
-                        placeholder="Achados do Doppler vascular..."
-                        rows={6}
-                        className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand-400 resize-y"
-                      />
-                      <div className="mt-4">
-                        <label className="block text-sm font-medium text-surface-700 mb-1.5">Anamnese</label>
+                  {activeTab === 'procedimento' && (
+                    <div className="space-y-5">
+                      <div>
+                        <label className="block text-sm font-medium text-surface-700 mb-1.5">Doppler Vascular</label>
                         <textarea
-                          value={(prontuario as any).anamnese}
-                          onChange={e => setProntuario(p => ({ ...p, anamnese: e.target.value }))}
-                          placeholder="Historia clinica, queixas, sintomas..."
+                          value={(prontuario as any).doppler}
+                          onChange={e => setProntuario(p => ({ ...p, doppler: e.target.value }))}
+                          placeholder="Achados do Doppler vascular..."
                           rows={4}
                           className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand-400 resize-y"
                         />
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {dopplerTemplates.map((t, i) => (
+                            <button
+                              key={i}
+                              onClick={() => setProntuario(p => ({ ...p, doppler: t }))}
+                              className="text-xs px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-colors"
+                            >
+                              Doppler {i + 1}
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
 
-                  {activeTab === 'procedimento' && (
-                    <div>
-                      <label className="block text-sm font-medium text-surface-700 mb-1.5">Descricao do Procedimento</label>
-                      <textarea
-                        value={(prontuario as any).descricao_procedimento}
-                        onChange={e => setProntuario(p => ({ ...p, descricao_procedimento: e.target.value }))}
-                        placeholder="Descreva o procedimento realizado..."
-                        rows={6}
-                        className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand-400 resize-y"
-                      />
-                      <div className="flex flex-wrap gap-1.5 mt-2">
-                        {templates.map((t, i) => (
-                          <button
-                            key={i}
-                            onClick={() => setProntuario(p => ({ ...p, descricao_procedimento: t }))}
-                            className="text-xs px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors"
-                          >
-                            Template {i + 1}
-                          </button>
-                        ))}
+                      <div>
+                        <label className="block text-sm font-medium text-surface-700 mb-1.5">Descricao do Procedimento</label>
+                        <textarea
+                          value={(prontuario as any).descricao_procedimento}
+                          onChange={e => setProntuario(p => ({ ...p, descricao_procedimento: e.target.value }))}
+                          placeholder="Descreva o procedimento realizado..."
+                          rows={4}
+                          className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand-400 resize-y"
+                        />
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {templates.map((t, i) => (
+                            <button
+                              key={i}
+                              onClick={() => setProntuario(p => ({ ...p, descricao_procedimento: t }))}
+                              className="text-xs px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors"
+                            >
+                              Procedimento {i + 1}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   )}
@@ -993,7 +1008,8 @@ export default function ConsultorioPage() {
                       />
                     </div>
                   )}
-                </div><div className="px-5 py-4 border-t border-surface-100 flex justify-between gap-2">
+                </div>
+                <div className="px-5 py-4 border-t border-surface-100 flex justify-between gap-2">
                   <div className="flex gap-2 flex-wrap">
                     <button onClick={() => salvarProntuario(false)} disabled={saving} className="btn-secondary text-sm">
                       Salvar Rascunho
