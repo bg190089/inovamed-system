@@ -13,7 +13,7 @@ import type { Atendimento } from '@/types';
 
 // Helper: Calculate wait time in minutes from hora_chegada
 function calcWaitTime(hora_chegada: string | null): string {
-  if (!hora_chegada) return '—';
+  if (!hora_chegada) return 'â';
   const diff = Math.floor((Date.now() - new Date(hora_chegada).getTime()) / 60000);
   if (diff < 1) return '<1 min';
   if (diff >= 60) return `${Math.floor(diff / 60)}h${diff % 60}min`;
@@ -22,11 +22,11 @@ function calcWaitTime(hora_chegada: string | null): string {
 
 // Helper: Get priority badge for age
 function getAgePriority(dataNascimento: string | null): { age: number; badge: string; color: string; label: string } {
-  if (!dataNascimento) return { age: 0, badge: '—', color: '', label: '' };
+  if (!dataNascimento) return { age: 0, badge: 'â', color: '', label: '' };
   const age = calcularIdade(dataNascimento);
-  if (age >= 60) return { age, badge: '🔴', color: 'text-red-600', label: 'PRIOR.' };
-  if (age < 12) return { age, badge: '🟠', color: 'text-orange-600', label: 'CRIANÇA' };
-  if (age < 18) return { age, badge: '🟡', color: 'text-yellow-600', label: '' };
+  if (age >= 60) return { age, badge: 'ð´', color: 'text-red-600', label: 'PRIOR.' };
+  if (age < 12) return { age, badge: 'ð ', color: 'text-orange-600', label: 'CRIANÃA' };
+  if (age < 18) return { age, badge: 'ð¡', color: 'text-yellow-600', label: '' };
   return { age, badge: '', color: '', label: '' };
 }
 
@@ -62,6 +62,7 @@ export default function ConsultorioPage() {
   // Templates state
   const [templates, setTemplates] = useState<string[]>(DEFAULT_TEMPLATES);
   const [showTemplateEditor, setShowTemplateEditor] = useState(false);
+  const [activeTab, setActiveTab] = useState<'doppler' | 'procedimento' | 'observacao' | 'receita'>('doppler')
   const [editingTemplate, setEditingTemplate] = useState('');
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [newTemplate, setNewTemplate] = useState('');
@@ -259,7 +260,7 @@ export default function ConsultorioPage() {
       }
       await service.salvarProntuario(atendimentoAtual.id, prontuarioData, finalizar);
       if (finalizar) {
-        // Backup assíncrono no Google Drive (fire-and-forget)
+        // Backup assÃ­ncrono no Google Drive (fire-and-forget)
         fetch('/api/drive/backup-prontuario', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -268,7 +269,7 @@ export default function ConsultorioPage() {
           .then((r) => r.json())
           .then((res) => {
             if (res.success) {
-              toast.success('Backup do prontuário salvo no Google Drive');
+              toast.success('Backup do prontuÃ¡rio salvo no Google Drive');
             }
           })
           .catch(() => {});
@@ -487,7 +488,7 @@ export default function ConsultorioPage() {
     <div className="p-6 lg:p-8 max-w-7xl mx-auto pt-16 lg:pt-0">
       <PageHeader
         title="Consultorio"
-        subtitle={`Dr(a). ${(user?.nome_completo || '').replace(/^(DR\.?|DRA\.?)\s*/i, '').split(' ').filter(Boolean).slice(0, 2).map(w => w.charAt(0) + w.slice(1).toLowerCase()).join(' ')} • ${(selectedUnidade as any)?.municipio?.nome || '—'} • ${formatDate(new Date(), 'dd/MM/yyyy')}`}
+        subtitle={`Dr(a). ${(user?.nome_completo || '').replace(/^(DR\.?|DRA\.?)\s*/i, '').split(' ').filter(Boolean).slice(0, 2).map(w => w.charAt(0) + w.slice(1).toLowerCase()).join(' ')} â¢ ${(selectedUnidade as any)?.municipio?.nome || 'â'} â¢ ${formatDate(new Date(), 'dd/MM/yyyy')}`}
       />
 
       {/* Queue Summary Cards */}
@@ -581,7 +582,7 @@ export default function ConsultorioPage() {
                             <div className="flex items-center gap-1 text-xs text-surface-500">
                               <span className={agePriority.color}>{agePriority.age}a {agePriority.badge}</span>
                               {agePriority.label && <span className={`text-[10px] font-semibold ${agePriority.color}`}>{agePriority.label}</span>}
-                              <span>•</span>
+                              <span>â¢</span>
                               <span>{calcWaitTime(atend.hora_chegada)}</span>
                             </div>
                           </div>
@@ -613,8 +614,8 @@ export default function ConsultorioPage() {
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium text-surface-800 truncate">{atend.paciente?.nome_completo}</p>
                               <p className="text-xs text-surface-500 mt-0.5">
-                                {agePriority.age}a • {atend.procedimento?.tipo === 'bilateral' ? 'Bilateral' : 'Unilateral'}
-                                {atend.reabertura_count ? ` • Reaberto ${atend.reabertura_count}x` : ''}
+                                {agePriority.age}a â¢ {atend.procedimento?.tipo === 'bilateral' ? 'Bilateral' : 'Unilateral'}
+                                {atend.reabertura_count ? ` â¢ Reaberto ${atend.reabertura_count}x` : ''}
                               </p>
                             </div>
                             <div className="flex gap-1.5 flex-shrink-0">
@@ -655,7 +656,7 @@ export default function ConsultorioPage() {
           {!atendimentoAtual ? (
             <div className="card">
               <EmptyState
-                icon="📋"
+                icon="ð"
                 title="Selecione um paciente da fila"
                 description="Clique em um paciente para iniciar o atendimento"
               />
@@ -666,7 +667,7 @@ export default function ConsultorioPage() {
               {sessoesPaciente >= 4 && (
                 <div className="card p-3 bg-red-50 border border-red-200">
                   <div className="flex items-center gap-2">
-                    <span className="text-red-600 text-lg">⚠️</span>
+                    <span className="text-red-600 text-lg">â ï¸</span>
                     <div>
                       <p className="text-sm font-bold text-red-700">ALERTA: {sessoesPaciente}a sessao em menos de 12 meses</p>
                       <p className="text-xs text-red-600">Paciente atingiu o limite de sessoes. Verificar necessidade clinica.</p>
@@ -691,9 +692,9 @@ export default function ConsultorioPage() {
                       )}
                     </h3>
                     <p className="text-sm text-surface-500 mt-0.5">
-                      {calcularIdade(atendimentoAtual.paciente?.data_nascimento || '')} anos •{' '}
-                      {atendimentoAtual.paciente?.sexo === 'F' ? 'Feminino' : 'Masculino'} • CPF:{' '}
-                      {maskCPF(atendimentoAtual.paciente?.cpf || '')} • Nasc:{' '}
+                      {calcularIdade(atendimentoAtual.paciente?.data_nascimento || '')} anos â¢{' '}
+                      {atendimentoAtual.paciente?.sexo === 'F' ? 'Feminino' : 'Masculino'} â¢ CPF:{' '}
+                      {maskCPF(atendimentoAtual.paciente?.cpf || '')} â¢ Nasc:{' '}
                       {formatDate(atendimentoAtual.paciente?.data_nascimento || '', 'dd/MM/yyyy')}
                     </p>
                   </div>
@@ -715,7 +716,7 @@ export default function ConsultorioPage() {
                       <div key={h.id} className="bg-surface-50 rounded-lg p-3">
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-xs font-semibold text-surface-600">
-                            {formatDate(h.data_atendimento, 'dd/MM/yyyy')} • {(h.unidade as any)?.municipio?.nome}
+                            {formatDate(h.data_atendimento, 'dd/MM/yyyy')} â¢ {(h.unidade as any)?.municipio?.nome}
                           </span>
                           <span className="badge bg-surface-200 text-surface-600 text-[10px]">
                             {h.procedimento?.tipo === 'bilateral' ? 'Bilateral' : 'Unilateral'}
@@ -742,7 +743,62 @@ export default function ConsultorioPage() {
                 </div>
               )}
 
-              {/* Form */}
+              {/* Triagem Resumo Compacto */}
+                {triagemData && (
+                  <div className="card mb-4">
+                    <div className="px-4 py-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-sm font-semibold text-surface-700">Triagem</h4>
+                        <button
+                          onClick={() => setShowTriagem(!showTriagem)}
+                          className="text-xs text-brand-600 hover:text-brand-700 font-medium"
+                        >
+                          {showTriagem ? 'Ocultar detalhes' : 'Ver triagem completa'}
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-2 items-center">
+                        {triagemData.pressao_arterial && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800">
+                            PA: {triagemData.pressao_arterial}
+                          </span>
+                        )}
+                        {triagemData.hgt && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-800">
+                            HGT: {triagemData.hgt} mg/dL
+                          </span>
+                        )}
+                        {triagemData.alergia && triagemData.alergia.trim() !== '' && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">
+                            Alergia: {triagemData.alergia}
+                          </span>
+                        )}
+                        {triagemData.diabetes && <span className="px-2 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-700">Diabetes</span>}
+                        {triagemData.hipertensao && <span className="px-2 py-1 rounded-full text-xs font-semibold bg-rose-100 text-rose-700">Hipertensao</span>}
+                        {triagemData.tabagista && <span className="px-2 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">Tabagista</span>}
+                        {triagemData.trombose_embolia && <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">TVP/Embolia</span>}
+                        {triagemData.doencas_vasculares && <span className="px-2 py-1 rounded-full text-xs font-semibold bg-pink-100 text-pink-700">D. Vasculares</span>}
+                        {triagemData.doencas_cardiacas && <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-600">D. Cardiacas</span>}
+                        {triagemData.gravidez_amamentacao && <span className="px-2 py-1 rounded-full text-xs font-semibold bg-pink-100 text-pink-600">Gravidez/Amamentacao</span>}
+                        {triagemData.escleroterapia_anterior && <span className="px-2 py-1 rounded-full text-xs font-semibold bg-teal-100 text-teal-700">Esclerot. Anterior</span>}
+                        {triagemData.doppler_venoso && <span className="px-2 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700">Doppler Venoso</span>}
+                      </div>
+                      {showTriagem && (
+                        <div className="mt-3 pt-3 border-t border-surface-100 space-y-2 text-sm text-surface-600">
+                          {triagemData.outras_doencas && <p><span className="font-medium text-surface-700">Outras doencas:</span> {triagemData.outras_doencas}</p>}
+                          {triagemData.doencas_hepaticas && <p><span className="font-medium text-surface-700">D. Hepaticas:</span> Sim</p>}
+                          {triagemData.doencas_renais && <p><span className="font-medium text-surface-700">D. Renais:</span> Sim</p>}
+                          {triagemData.trombose_embolia_detalhe && <p><span className="font-medium text-surface-700">TVP/Embolia detalhe:</span> {triagemData.trombose_embolia_detalhe}</p>}
+                          {triagemData.doencas_vasculares_detalhe && <p><span className="font-medium text-surface-700">D. Vasculares detalhe:</span> {triagemData.doencas_vasculares_detalhe}</p>}
+                          {triagemData.doppler_venoso_detalhe && <p><span className="font-medium text-surface-700">Doppler venoso detalhe:</span> {triagemData.doppler_venoso_detalhe}</p>}
+                          {triagemData.escleroterapia_quando && <p><span className="font-medium text-surface-700">Escleroterapia quando:</span> {triagemData.escleroterapia_quando}</p>}
+                          {triagemData.observacao && <p><span className="font-medium text-surface-700">Obs triagem:</span> {triagemData.observacao}</p>}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+{/* Form */}
               <div className="card">
                 <div className="px-5 py-3 border-b border-surface-100 bg-surface-50/50 flex items-center justify-between">
                   <h3 className="font-display font-semibold text-surface-800">Prontuario</h3>
@@ -841,111 +897,104 @@ export default function ConsultorioPage() {
                   </div>
                 )}
 
-                {/* Triagem Summary */}
-                {triagemData && (
-                  <div className="mx-5 mt-4">
-                    <button onClick={() => setShowTriagem(!showTriagem)}
-                      className="w-full flex items-center justify-between px-4 py-3 rounded-lg bg-purple-50 border border-purple-200 hover:bg-purple-100 transition-colors">
-                      <span className="text-sm font-semibold text-purple-800 flex items-center gap-2">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
-                        Triagem do Paciente
-                      </span>
-                      <svg className={cn('w-4 h-4 text-purple-600 transition-transform', showTriagem && 'rotate-180')} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                    </button>
-                    {showTriagem && (
-                      <div className="mt-2 p-4 rounded-lg border border-purple-200 bg-white text-sm space-y-2">
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                          <div><span className="text-xs text-surface-500">PA:</span> <span className="font-medium">{triagemData.pressao_arterial || '—'}</span></div>
-                          <div><span className="text-xs text-surface-500">HGT:</span> <span className="font-medium">{triagemData.hgt || '—'}</span></div>
-                          <div><span className="text-xs text-surface-500">Alergia:</span> <span className="font-medium">{triagemData.alergia || 'Nenhuma'}</span></div>
-                        </div>
-                        <div className="flex flex-wrap gap-1.5 pt-1">
-                          {triagemData.diabetes && <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs">Diabetes</span>}
-                          {triagemData.hipertensao && <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs">Hipertensao</span>}
-                          {triagemData.doencas_cardiacas && <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs">Cardiacas</span>}
-                          {triagemData.doencas_hepaticas && <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs">Hepaticas</span>}
-                          {triagemData.doencas_renais && <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs">Renais</span>}
-                          {triagemData.escleroterapia_anterior && <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs">Escleroterapia ant. {triagemData.escleroterapia_quando ? `(${triagemData.escleroterapia_quando})` : ''}</span>}
-                          {triagemData.trombose_embolia && <span className="px-2 py-0.5 bg-red-100 text-red-800 rounded text-xs font-semibold">Trombose/Embolia</span>}
-                          {triagemData.doencas_vasculares && <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs">D. Vasculares</span>}
-                          {triagemData.doppler_venoso && <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">Doppler: {triagemData.doppler_venoso_detalhe || 'Sim'}</span>}
-                          {triagemData.gravidez_amamentacao && <span className="px-2 py-0.5 bg-pink-100 text-pink-700 rounded text-xs font-semibold">Gravidez/Amamentacao</span>}
-                          {triagemData.tabagista && <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs">Tabagista</span>}
-                        </div>
-                        {triagemData.outras_doencas && <p className="text-xs text-surface-600"><span className="font-medium">Outras:</span> {triagemData.outras_doencas}</p>}
-                        {triagemData.observacao && <p className="text-xs text-surface-600"><span className="font-medium">Obs triagem:</span> {triagemData.observacao}</p>}
-                        <p className="text-[10px] text-surface-400 pt-1">Triagem em {formatDate(triagemData.created_at, 'dd/MM/yyyy HH:mm')}</p>
-                      </div>
-                    )}
+                
+                <div className="px-5 pt-3 pb-0">
+                  <div className="flex gap-1 border-b border-surface-200">
+                    {[
+                      { key: 'doppler', label: 'Doppler', icon: '' },
+                      { key: 'procedimento', label: 'Procedimento', icon: '' },
+                      { key: 'observacao', label: 'Observacao', icon: '' },
+                      { key: 'receita', label: 'Receita', icon: '' },
+                    ].map(tab => (
+                      <button
+                        key={tab.key}
+                        onClick={() => setActiveTab(tab.key as any)}
+                        className={`px-4 py-2.5 text-sm font-medium transition-colors relative ${
+                          activeTab === tab.key 
+                            ? 'text-brand-600 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-brand-600' 
+                            : 'text-surface-500 hover:text-surface-700'
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
                   </div>
-                )}
-
-                {/* PA / HGT from Triagem - Highlighted */}
-                {triagemData && (triagemData.pressao_arterial || triagemData.hgt) && (
-                  <div className="mx-5 mt-4 grid grid-cols-2 gap-3">
-                    {triagemData.pressao_arterial && (
-                      <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-lg p-3">
-                        <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
-                          <svg className="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-red-500 uppercase font-semibold tracking-wide">Pressao Arterial</p>
-                          <p className="text-lg font-bold text-red-700">{triagemData.pressao_arterial}</p>
-                        </div>
-                      </div>
-                    )}
-                    {triagemData.hgt && (
-                      <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-lg p-3">
-                        <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
-                          <svg className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-amber-500 uppercase font-semibold tracking-wide">HGT (Glicemia)</p>
-                          <p className="text-lg font-bold text-amber-700">{triagemData.hgt} mg/dL</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div className="p-5 space-y-4">
-                  {[
-                    { key: 'doppler', label: 'Doppler Vascular', color: 'bg-blue-500', placeholder: 'Achados do Doppler vascular...', rows: 3 },
-                    { key: 'anamnese', label: 'Anamnese', color: 'bg-amber-500', placeholder: 'Historia clinica, queixas, sintomas...', rows: 3 },
-                    { key: 'descricao_procedimento', label: 'Descricao do Procedimento', color: 'bg-emerald-500', placeholder: 'Descreva o procedimento realizado...', rows: 4, templates: true },
-                    { key: 'observacoes', label: 'Observacoes', color: '', placeholder: 'Observacoes adicionais...', rows: 2 },
-                    { key: 'receita', label: 'Receita', color: 'bg-pink-500', placeholder: 'Prescricao medica...\nEx: Meia elastica 20-30 mmHg - usar por 7 dias\nAntiinflamatorio - se necessario', rows: 4 },
-                  ].map((field) => (
-                    <div key={field.key}>
-                      <label className="input-label flex items-center gap-2">
-                        {field.color && <span className={`w-2 h-2 rounded-full ${field.color}`} />}
-                        {field.label}
-                      </label>
-                      <textarea
-                        value={(prontuario as any)[field.key]}
-                        onChange={(e) => setProntuario({ ...prontuario, [field.key]: e.target.value })}
-                        className="input-field resize-y"
-                        style={{ minHeight: `${field.rows * 28}px` }}
-                        placeholder={field.placeholder}
-                      />
-                      {field.templates && (
-                        <div className="mt-2 flex gap-2 flex-wrap">
-                          {templates.map((t, i) => (
-                            <button
-                              key={i}
-                              onClick={() => setProntuario({ ...prontuario, descricao_procedimento: t })}
-                              className="text-[10px] text-brand-600 bg-brand-50 px-2 py-1 rounded-md hover:bg-brand-100 transition-colors"
-                              title={t}
-                            >
-                              Template {i + 1}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
                 </div>
-                <div className="px-5 py-4 border-t border-surface-100 flex justify-between gap-2">
+                <div className="p-5">
+                  {activeTab === 'doppler' && (
+                    <div>
+                      <label className="block text-sm font-medium text-surface-700 mb-1.5">Doppler Vascular</label>
+                      <textarea
+                        value={(prontuario as any).doppler}
+                        onChange={e => setProntuario(p => ({ ...p, doppler: e.target.value }))}
+                        placeholder="Achados do Doppler vascular..."
+                        rows={6}
+                        className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand-400 resize-y"
+                      />
+                    
+                      <div className="mt-4">
+                        <label className="block text-sm font-medium text-surface-700 mb-1.5">Anamnese</label>
+                        <textarea
+                          value={(prontuario as any).anamnese}
+                          onChange={e => setProntuario(p => ({ ...p, anamnese: e.target.value }))}
+                          placeholder="Historia clinica, queixas, sintomas..."
+                          rows={4}
+                          className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand-400 resize-y"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {activeTab === 'procedimento' && (
+                    <div>
+                      <label className="block text-sm font-medium text-surface-700 mb-1.5">Descricao do Procedimento</label>
+                      <textarea
+                        value={(prontuario as any).descricao_procedimento}
+                        onChange={e => setProntuario(p => ({ ...p, descricao_procedimento: e.target.value }))}
+                        placeholder="Descreva o procedimento realizado..."
+                        rows={6}
+                        className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand-400 resize-y"
+                      />
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {templates.map((t, i) => (
+                          <button
+                            key={i}
+                            onClick={() => setProntuario(p => ({ ...p, descricao_procedimento: t }))}
+                            className="text-xs px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors"
+                          >
+                            Template {i + 1}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {activeTab === 'observacao' && (
+                    <div>
+                      <label className="block text-sm font-medium text-surface-700 mb-1.5">Observacoes</label>
+                      <textarea
+                        value={(prontuario as any).observacoes}
+                        onChange={e => setProntuario(p => ({ ...p, observacoes: e.target.value }))}
+                        placeholder="Observacoes adicionais..."
+                        rows={6}
+                        className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand-400 resize-y"
+                      />
+                    </div>
+                  )}
+
+                  {activeTab === 'receita' && (
+                    <div>
+                      <label className="block text-sm font-medium text-surface-700 mb-1.5">Receita</label>
+                      <textarea
+                        value={(prontuario as any).receita}
+                        onChange={e => setProntuario(p => ({ ...p, receita: e.target.value }))}
+                        placeholder="Prescricao medica...\nEx: Meia elastica 20-30 mmHg - usar por 7 dias\nAntiinflamatorio - se necessario"
+                        rows={6}
+                        className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand-400 resize-y"
+                      />
+                    </div>
+                  )}
+                </div><div className="px-5 py-4 border-t border-surface-100 flex justify-between gap-2">
                   <div className="flex gap-2 flex-wrap">
                     <button onClick={() => salvarProntuario(false)} disabled={saving} className="btn-secondary text-sm">
                       Salvar Rascunho
