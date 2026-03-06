@@ -1,4 +1,15 @@
-'use client';
+
+                      <div className="mt-4">
+                        <label className="block text-sm font-medium text-surface-700 mb-1.5">Anamnese</label>
+                        <textarea
+                          value={(prontuario as any).anamnese}
+                          onChange={e => setProntuario(p => ({ ...p, anamnese: e.target.value }))}
+                          placeholder="Historia clinica, queixas, sintomas..."
+                          rows={4}
+                          className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand-400 resize-y"
+                        />
+                      </div>
+                    'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
@@ -13,7 +24,7 @@ import type { Atendimento } from '@/types';
 
 // Helper: Calculate wait time in minutes from hora_chegada
 function calcWaitTime(hora_chegada: string | null): string {
-  if (!hora_chegada) return 'â';
+  if (!hora_chegada) return '—';
   const diff = Math.floor((Date.now() - new Date(hora_chegada).getTime()) / 60000);
   if (diff < 1) return '<1 min';
   if (diff >= 60) return `${Math.floor(diff / 60)}h${diff % 60}min`;
@@ -22,11 +33,11 @@ function calcWaitTime(hora_chegada: string | null): string {
 
 // Helper: Get priority badge for age
 function getAgePriority(dataNascimento: string | null): { age: number; badge: string; color: string; label: string } {
-  if (!dataNascimento) return { age: 0, badge: 'â', color: '', label: '' };
+  if (!dataNascimento) return { age: 0, badge: '—', color: '', label: '' };
   const age = calcularIdade(dataNascimento);
-  if (age >= 60) return { age, badge: 'ð´', color: 'text-red-600', label: 'PRIOR.' };
-  if (age < 12) return { age, badge: 'ð ', color: 'text-orange-600', label: 'CRIANÃA' };
-  if (age < 18) return { age, badge: 'ð¡', color: 'text-yellow-600', label: '' };
+  if (age >= 60) return { age, badge: '🔴', color: 'text-red-600', label: 'PRIOR.' };
+  if (age < 12) return { age, badge: '🟠', color: 'text-orange-600', label: 'CRIANÇA' };
+  if (age < 18) return { age, badge: '🟡', color: 'text-yellow-600', label: '' };
   return { age, badge: '', color: '', label: '' };
 }
 
@@ -260,7 +271,7 @@ export default function ConsultorioPage() {
       }
       await service.salvarProntuario(atendimentoAtual.id, prontuarioData, finalizar);
       if (finalizar) {
-        // Backup assÃ­ncrono no Google Drive (fire-and-forget)
+        // Backup assíncrono no Google Drive (fire-and-forget)
         fetch('/api/drive/backup-prontuario', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -269,7 +280,7 @@ export default function ConsultorioPage() {
           .then((r) => r.json())
           .then((res) => {
             if (res.success) {
-              toast.success('Backup do prontuÃ¡rio salvo no Google Drive');
+              toast.success('Backup do prontuário salvo no Google Drive');
             }
           })
           .catch(() => {});
@@ -488,7 +499,7 @@ export default function ConsultorioPage() {
     <div className="p-6 lg:p-8 max-w-7xl mx-auto pt-16 lg:pt-0">
       <PageHeader
         title="Consultorio"
-        subtitle={`Dr(a). ${(user?.nome_completo || '').replace(/^(DR\.?|DRA\.?)\s*/i, '').split(' ').filter(Boolean).slice(0, 2).map(w => w.charAt(0) + w.slice(1).toLowerCase()).join(' ')} â¢ ${(selectedUnidade as any)?.municipio?.nome || 'â'} â¢ ${formatDate(new Date(), 'dd/MM/yyyy')}`}
+        subtitle={`Dr(a). ${(user?.nome_completo || '').replace(/^(DR\.?|DRA\.?)\s*/i, '').split(' ').filter(Boolean).slice(0, 2).map(w => w.charAt(0) + w.slice(1).toLowerCase()).join(' ')} • ${(selectedUnidade as any)?.municipio?.nome || '—'} • ${formatDate(new Date(), 'dd/MM/yyyy')}`}
       />
 
       {/* Queue Summary Cards */}
@@ -582,7 +593,7 @@ export default function ConsultorioPage() {
                             <div className="flex items-center gap-1 text-xs text-surface-500">
                               <span className={agePriority.color}>{agePriority.age}a {agePriority.badge}</span>
                               {agePriority.label && <span className={`text-[10px] font-semibold ${agePriority.color}`}>{agePriority.label}</span>}
-                              <span>â¢</span>
+                              <span>•</span>
                               <span>{calcWaitTime(atend.hora_chegada)}</span>
                             </div>
                           </div>
@@ -614,8 +625,8 @@ export default function ConsultorioPage() {
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium text-surface-800 truncate">{atend.paciente?.nome_completo}</p>
                               <p className="text-xs text-surface-500 mt-0.5">
-                                {agePriority.age}a â¢ {atend.procedimento?.tipo === 'bilateral' ? 'Bilateral' : 'Unilateral'}
-                                {atend.reabertura_count ? ` â¢ Reaberto ${atend.reabertura_count}x` : ''}
+                                {agePriority.age}a • {atend.procedimento?.tipo === 'bilateral' ? 'Bilateral' : 'Unilateral'}
+                                {atend.reabertura_count ? ` • Reaberto ${atend.reabertura_count}x` : ''}
                               </p>
                             </div>
                             <div className="flex gap-1.5 flex-shrink-0">
@@ -656,7 +667,7 @@ export default function ConsultorioPage() {
           {!atendimentoAtual ? (
             <div className="card">
               <EmptyState
-                icon="ð"
+                icon="📋"
                 title="Selecione um paciente da fila"
                 description="Clique em um paciente para iniciar o atendimento"
               />
@@ -667,7 +678,7 @@ export default function ConsultorioPage() {
               {sessoesPaciente >= 4 && (
                 <div className="card p-3 bg-red-50 border border-red-200">
                   <div className="flex items-center gap-2">
-                    <span className="text-red-600 text-lg">â ï¸</span>
+                    <span className="text-red-600 text-lg">⚠️</span>
                     <div>
                       <p className="text-sm font-bold text-red-700">ALERTA: {sessoesPaciente}a sessao em menos de 12 meses</p>
                       <p className="text-xs text-red-600">Paciente atingiu o limite de sessoes. Verificar necessidade clinica.</p>
@@ -692,9 +703,9 @@ export default function ConsultorioPage() {
                       )}
                     </h3>
                     <p className="text-sm text-surface-500 mt-0.5">
-                      {calcularIdade(atendimentoAtual.paciente?.data_nascimento || '')} anos â¢{' '}
-                      {atendimentoAtual.paciente?.sexo === 'F' ? 'Feminino' : 'Masculino'} â¢ CPF:{' '}
-                      {maskCPF(atendimentoAtual.paciente?.cpf || '')} â¢ Nasc:{' '}
+                      {calcularIdade(atendimentoAtual.paciente?.data_nascimento || '')} anos •{' '}
+                      {atendimentoAtual.paciente?.sexo === 'F' ? 'Feminino' : 'Masculino'} • CPF:{' '}
+                      {maskCPF(atendimentoAtual.paciente?.cpf || '')} • Nasc:{' '}
                       {formatDate(atendimentoAtual.paciente?.data_nascimento || '', 'dd/MM/yyyy')}
                     </p>
                   </div>
@@ -716,7 +727,7 @@ export default function ConsultorioPage() {
                       <div key={h.id} className="bg-surface-50 rounded-lg p-3">
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-xs font-semibold text-surface-600">
-                            {formatDate(h.data_atendimento, 'dd/MM/yyyy')} â¢ {(h.unidade as any)?.municipio?.nome}
+                            {formatDate(h.data_atendimento, 'dd/MM/yyyy')} • {(h.unidade as any)?.municipio?.nome}
                           </span>
                           <span className="badge bg-surface-200 text-surface-600 text-[10px]">
                             {h.procedimento?.tipo === 'bilateral' ? 'Bilateral' : 'Unilateral'}
@@ -743,62 +754,7 @@ export default function ConsultorioPage() {
                 </div>
               )}
 
-              {/* Triagem Resumo Compacto */}
-                {triagemData && (
-                  <div className="card mb-4">
-                    <div className="px-4 py-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="text-sm font-semibold text-surface-700">Triagem</h4>
-                        <button
-                          onClick={() => setShowTriagem(!showTriagem)}
-                          className="text-xs text-brand-600 hover:text-brand-700 font-medium"
-                        >
-                          {showTriagem ? 'Ocultar detalhes' : 'Ver triagem completa'}
-                        </button>
-                      </div>
-                      <div className="flex flex-wrap gap-2 items-center">
-                        {triagemData.pressao_arterial && (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800">
-                            PA: {triagemData.pressao_arterial}
-                          </span>
-                        )}
-                        {triagemData.hgt && (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-800">
-                            HGT: {triagemData.hgt} mg/dL
-                          </span>
-                        )}
-                        {triagemData.alergia && triagemData.alergia.trim() !== '' && (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">
-                            Alergia: {triagemData.alergia}
-                          </span>
-                        )}
-                        {triagemData.diabetes && <span className="px-2 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-700">Diabetes</span>}
-                        {triagemData.hipertensao && <span className="px-2 py-1 rounded-full text-xs font-semibold bg-rose-100 text-rose-700">Hipertensao</span>}
-                        {triagemData.tabagista && <span className="px-2 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">Tabagista</span>}
-                        {triagemData.trombose_embolia && <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">TVP/Embolia</span>}
-                        {triagemData.doencas_vasculares && <span className="px-2 py-1 rounded-full text-xs font-semibold bg-pink-100 text-pink-700">D. Vasculares</span>}
-                        {triagemData.doencas_cardiacas && <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-600">D. Cardiacas</span>}
-                        {triagemData.gravidez_amamentacao && <span className="px-2 py-1 rounded-full text-xs font-semibold bg-pink-100 text-pink-600">Gravidez/Amamentacao</span>}
-                        {triagemData.escleroterapia_anterior && <span className="px-2 py-1 rounded-full text-xs font-semibold bg-teal-100 text-teal-700">Esclerot. Anterior</span>}
-                        {triagemData.doppler_venoso && <span className="px-2 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700">Doppler Venoso</span>}
-                      </div>
-                      {showTriagem && (
-                        <div className="mt-3 pt-3 border-t border-surface-100 space-y-2 text-sm text-surface-600">
-                          {triagemData.outras_doencas && <p><span className="font-medium text-surface-700">Outras doencas:</span> {triagemData.outras_doencas}</p>}
-                          {triagemData.doencas_hepaticas && <p><span className="font-medium text-surface-700">D. Hepaticas:</span> Sim</p>}
-                          {triagemData.doencas_renais && <p><span className="font-medium text-surface-700">D. Renais:</span> Sim</p>}
-                          {triagemData.trombose_embolia_detalhe && <p><span className="font-medium text-surface-700">TVP/Embolia detalhe:</span> {triagemData.trombose_embolia_detalhe}</p>}
-                          {triagemData.doencas_vasculares_detalhe && <p><span className="font-medium text-surface-700">D. Vasculares detalhe:</span> {triagemData.doencas_vasculares_detalhe}</p>}
-                          {triagemData.doppler_venoso_detalhe && <p><span className="font-medium text-surface-700">Doppler venoso detalhe:</span> {triagemData.doppler_venoso_detalhe}</p>}
-                          {triagemData.escleroterapia_quando && <p><span className="font-medium text-surface-700">Escleroterapia quando:</span> {triagemData.escleroterapia_quando}</p>}
-                          {triagemData.observacao && <p><span className="font-medium text-surface-700">Obs triagem:</span> {triagemData.observacao}</p>}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-{/* Form */}
+              NaN{/* Form */}
               <div className="card">
                 <div className="px-5 py-3 border-b border-surface-100 bg-surface-50/50 flex items-center justify-between">
                   <h3 className="font-display font-semibold text-surface-800">Prontuario</h3>
@@ -897,104 +853,7 @@ export default function ConsultorioPage() {
                   </div>
                 )}
 
-                
-                <div className="px-5 pt-3 pb-0">
-                  <div className="flex gap-1 border-b border-surface-200">
-                    {[
-                      { key: 'doppler', label: 'Doppler', icon: '' },
-                      { key: 'procedimento', label: 'Procedimento', icon: '' },
-                      { key: 'observacao', label: 'Observacao', icon: '' },
-                      { key: 'receita', label: 'Receita', icon: '' },
-                    ].map(tab => (
-                      <button
-                        key={tab.key}
-                        onClick={() => setActiveTab(tab.key as any)}
-                        className={`px-4 py-2.5 text-sm font-medium transition-colors relative ${
-                          activeTab === tab.key 
-                            ? 'text-brand-600 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-brand-600' 
-                            : 'text-surface-500 hover:text-surface-700'
-                        }`}
-                      >
-                        {tab.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="p-5">
-                  {activeTab === 'doppler' && (
-                    <div>
-                      <label className="block text-sm font-medium text-surface-700 mb-1.5">Doppler Vascular</label>
-                      <textarea
-                        value={(prontuario as any).doppler}
-                        onChange={e => setProntuario(p => ({ ...p, doppler: e.target.value }))}
-                        placeholder="Achados do Doppler vascular..."
-                        rows={6}
-                        className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand-400 resize-y"
-                      />
-                    
-                      <div className="mt-4">
-                        <label className="block text-sm font-medium text-surface-700 mb-1.5">Anamnese</label>
-                        <textarea
-                          value={(prontuario as any).anamnese}
-                          onChange={e => setProntuario(p => ({ ...p, anamnese: e.target.value }))}
-                          placeholder="Historia clinica, queixas, sintomas..."
-                          rows={4}
-                          className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand-400 resize-y"
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {activeTab === 'procedimento' && (
-                    <div>
-                      <label className="block text-sm font-medium text-surface-700 mb-1.5">Descricao do Procedimento</label>
-                      <textarea
-                        value={(prontuario as any).descricao_procedimento}
-                        onChange={e => setProntuario(p => ({ ...p, descricao_procedimento: e.target.value }))}
-                        placeholder="Descreva o procedimento realizado..."
-                        rows={6}
-                        className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand-400 resize-y"
-                      />
-                      <div className="flex flex-wrap gap-1.5 mt-2">
-                        {templates.map((t, i) => (
-                          <button
-                            key={i}
-                            onClick={() => setProntuario(p => ({ ...p, descricao_procedimento: t }))}
-                            className="text-xs px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors"
-                          >
-                            Template {i + 1}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {activeTab === 'observacao' && (
-                    <div>
-                      <label className="block text-sm font-medium text-surface-700 mb-1.5">Observacoes</label>
-                      <textarea
-                        value={(prontuario as any).observacoes}
-                        onChange={e => setProntuario(p => ({ ...p, observacoes: e.target.value }))}
-                        placeholder="Observacoes adicionais..."
-                        rows={6}
-                        className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand-400 resize-y"
-                      />
-                    </div>
-                  )}
-
-                  {activeTab === 'receita' && (
-                    <div>
-                      <label className="block text-sm font-medium text-surface-700 mb-1.5">Receita</label>
-                      <textarea
-                        value={(prontuario as any).receita}
-                        onChange={e => setProntuario(p => ({ ...p, receita: e.target.value }))}
-                        placeholder="Prescricao medica...\nEx: Meia elastica 20-30 mmHg - usar por 7 dias\nAntiinflamatorio - se necessario"
-                        rows={6}
-                        className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand-400 resize-y"
-                      />
-                    </div>
-                  )}
-                </div><div className="px-5 py-4 border-t border-surface-100 flex justify-between gap-2">
+                undefinedundefined<div className="px-5 py-4 border-t border-surface-100 flex justify-between gap-2">
                   <div className="flex gap-2 flex-wrap">
                     <button onClick={() => salvarProntuario(false)} disabled={saving} className="btn-secondary text-sm">
                       Salvar Rascunho
