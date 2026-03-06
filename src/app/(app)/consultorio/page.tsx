@@ -341,13 +341,13 @@ function addDopplerTemplate() {
   }
 
   function updateDopplerTemplate() {
-    if (editingIndex === null) return;
+    if (editingDopplerIndex === null) return;
     if (!editingDopplerTemplate.trim()) {
       toast.error('Template nao pode estar vazio');
       return;
     }
     const updated = [...dopplerTemplates];
-    updated[editingIndex] = editingDopplerTemplate;
+    updated[editingDopplerIndex] = editingDopplerTemplate;
     setDopplerTemplates(updated);
     setEditingDopplerIndex(-1);
     setEditingDopplerTemplate('');
@@ -861,7 +861,7 @@ function addDopplerTemplate() {
                             <div className="space-y-2">
                               <textarea value={editingDopplerTemplate} onChange={e => setEditingDopplerTemplate(e.target.value)} rows={2} className="w-full px-2 py-1.5 border rounded text-sm" />
                               <div className="flex gap-2">
-                                <button onClick={() => updateDopplerTemplate(i)} className="text-xs px-2 py-1 bg-brand-600 text-white rounded">Salvar</button>
+                                <button onClick={() => updateDopplerTemplate()} className="text-xs px-2 py-1 bg-brand-600 text-white rounded">Salvar</button>
                                 <button onClick={() => setEditingDopplerIndex(-1)} className="text-xs px-2 py-1 bg-surface-200 rounded">Cancelar</button>
                               </div>
                             </div>
@@ -890,7 +890,7 @@ function addDopplerTemplate() {
                             <div className="space-y-2">
                               <textarea value={editingTemplate} onChange={e => setEditingTemplate(e.target.value)} rows={2} className="w-full px-2 py-1.5 border rounded text-sm" />
                               <div className="flex gap-2">
-                                <button onClick={() => updateTemplate(i)} className="text-xs px-2 py-1 bg-brand-600 text-white rounded">Salvar</button>
+                                <button onClick={() => updateTemplate()} className="text-xs px-2 py-1 bg-brand-600 text-white rounded">Salvar</button>
                                 <button onClick={() => setEditingIndex(-1)} className="text-xs px-2 py-1 bg-surface-200 rounded">Cancelar</button>
                               </div>
                             </div>
