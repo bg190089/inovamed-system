@@ -31,6 +31,7 @@ interface TriagemForm {
   doppler_venoso: boolean;
   doppler_venoso_detalhe: string;
   gravidez_amamentacao: boolean;
+  tabagista: boolean;
   observacao: string;
   data_proxima_sessao: string;
 }
@@ -43,7 +44,7 @@ const EMPTY_FORM: TriagemForm = {
   trombose_embolia: false, trombose_embolia_detalhe: '',
   doencas_vasculares: false, doencas_vasculares_detalhe: '',
   doppler_venoso: false, doppler_venoso_detalhe: '',
-  gravidez_amamentacao: false, observacao: '', data_proxima_sessao: '',
+  gravidez_amamentacao: false, tabagista: false, observacao: '', data_proxima_sessao: '',
 };
 
 export default function TriagemPage() {
@@ -173,6 +174,7 @@ export default function TriagemPage() {
           doppler_venoso: last.doppler_venoso,
           doppler_venoso_detalhe: last.doppler_venoso_detalhe || '',
           gravidez_amamentacao: last.gravidez_amamentacao,
+          tabagista: last.tabagista || false,
           observacao: last.observacao || '',
           data_proxima_sessao: '',
         });
@@ -802,6 +804,7 @@ export default function TriagemPage() {
                 {pacienteAvulso?.sexo === 'F' && (
                   <label className={cn('flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors mb-3', form.gravidez_amamentacao ? 'bg-pink-50 border-pink-300 text-pink-700' : 'border-surface-200 text-surface-600 hover:bg-surface-50')}><input type="checkbox" checked={form.gravidez_amamentacao} onChange={e => setForm(f => ({ ...f, gravidez_amamentacao: e.target.checked }))} className="rounded text-pink-600 focus:ring-pink-300" /><span className="text-sm">Gravidez ou Amamentacao?</span></label>
                 )}
+                <label className={cn('flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors mb-3', form.tabagista ? 'bg-amber-50 border-amber-300 text-amber-700' : 'border-surface-200 text-surface-600 hover:bg-surface-50')}><input type="checkbox" checked={form.tabagista} onChange={e => setForm(f => ({ ...f, tabagista: e.target.checked }))} className="rounded text-amber-600 focus:ring-amber-300" /><span className="text-sm">Tabagista?</span></label>
                 <div><label className="block text-xs font-medium text-surface-600 mb-1">Observacao</label><textarea value={form.observacao} onChange={e => setForm(f => ({ ...f, observacao: e.target.value }))} rows={3} placeholder="Observacoes..." className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-300 resize-none" /></div>
               </div>
 
@@ -1115,6 +1118,10 @@ export default function TriagemPage() {
                         <span className="text-sm">Gravidez ou Amamentacao?</span>
                       </label>
                     )}
+                    <label className={cn('flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors mb-3', form.tabagista ? 'bg-amber-50 border-amber-300 text-amber-700' : 'border-surface-200 text-surface-600 hover:bg-surface-50')}>
+                      <input type="checkbox" checked={form.tabagista} onChange={e => setForm(f => ({ ...f, tabagista: e.target.checked }))} className="rounded text-amber-600 focus:ring-amber-300" />
+                      <span className="text-sm">Tabagista?</span>
+                    </label>
                     <div>
                       <label className="block text-xs font-medium text-surface-600 mb-1">Observacao</label>
                       <textarea value={form.observacao}
