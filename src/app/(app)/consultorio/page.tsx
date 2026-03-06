@@ -349,7 +349,7 @@ function addDopplerTemplate() {
     const updated = [...dopplerTemplates];
     updated[editingIndex] = editingDopplerTemplate;
     setDopplerTemplates(updated);
-    setEditingDopplerIndex(null);
+    setEditingDopplerIndex(-1);
     setEditingDopplerTemplate('');
     toast.success('Template atualizado');
   }
