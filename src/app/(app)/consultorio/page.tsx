@@ -1,15 +1,4 @@
-
-                      <div className="mt-4">
-                        <label className="block text-sm font-medium text-surface-700 mb-1.5">Anamnese</label>
-                        <textarea
-                          value={(prontuario as any).anamnese}
-                          onChange={e => setProntuario(p => ({ ...p, anamnese: e.target.value }))}
-                          placeholder="Historia clinica, queixas, sintomas..."
-                          rows={4}
-                          className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand-400 resize-y"
-                        />
-                      </div>
-                    'use client';
+'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
@@ -754,7 +743,62 @@ export default function ConsultorioPage() {
                 </div>
               )}
 
-              NaN{/* Form */}
+              {/* Triagem Resumo Compacto */}
+                {triagemData && (
+                  <div className="card mb-4">
+                    <div className="px-4 py-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-sm font-semibold text-surface-700">Triagem</h4>
+                        <button
+                          onClick={() => setShowTriagem(!showTriagem)}
+                          className="text-xs text-brand-600 hover:text-brand-700 font-medium"
+                        >
+                          {showTriagem ? 'Ocultar detalhes' : 'Ver triagem completa'}
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-2 items-center">
+                        {triagemData.pressao_arterial && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800">
+                            PA: {triagemData.pressao_arterial}
+                          </span>
+                        )}
+                        {triagemData.hgt && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-800">
+                            HGT: {triagemData.hgt} mg/dL
+                          </span>
+                        )}
+                        {triagemData.alergia && triagemData.alergia.trim() !== '' && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">
+                            Alergia: {triagemData.alergia}
+                          </span>
+                        )}
+                        {triagemData.diabetes && <span className="px-2 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-700">Diabetes</span>}
+                        {triagemData.hipertensao && <span className="px-2 py-1 rounded-full text-xs font-semibold bg-rose-100 text-rose-700">Hipertensao</span>}
+                        {triagemData.tabagista && <span className="px-2 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">Tabagista</span>}
+                        {triagemData.trombose_embolia && <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">TVP/Embolia</span>}
+                        {triagemData.doencas_vasculares && <span className="px-2 py-1 rounded-full text-xs font-semibold bg-pink-100 text-pink-700">D. Vasculares</span>}
+                        {triagemData.doencas_cardiacas && <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-600">D. Cardiacas</span>}
+                        {triagemData.gravidez_amamentacao && <span className="px-2 py-1 rounded-full text-xs font-semibold bg-pink-100 text-pink-600">Gravidez/Amamentacao</span>}
+                        {triagemData.escleroterapia_anterior && <span className="px-2 py-1 rounded-full text-xs font-semibold bg-teal-100 text-teal-700">Esclerot. Anterior</span>}
+                        {triagemData.doppler_venoso && <span className="px-2 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700">Doppler Venoso</span>}
+                      </div>
+                      {showTriagem && (
+                        <div className="mt-3 pt-3 border-t border-surface-100 space-y-2 text-sm text-surface-600">
+                          {triagemData.outras_doencas && <p><span className="font-medium text-surface-700">Outras doencas:</span> {triagemData.outras_doencas}</p>}
+                          {triagemData.doencas_hepaticas && <p><span className="font-medium text-surface-700">D. Hepaticas:</span> Sim</p>}
+                          {triagemData.doencas_renais && <p><span className="font-medium text-surface-700">D. Renais:</span> Sim</p>}
+                          {triagemData.trombose_embolia_detalhe && <p><span className="font-medium text-surface-700">TVP/Embolia detalhe:</span> {triagemData.trombose_embolia_detalhe}</p>}
+                          {triagemData.doencas_vasculares_detalhe && <p><span className="font-medium text-surface-700">D. Vasculares detalhe:</span> {triagemData.doencas_vasculares_detalhe}</p>}
+                          {triagemData.doppler_venoso_detalhe && <p><span className="font-medium text-surface-700">Doppler venoso detalhe:</span> {triagemData.doppler_venoso_detalhe}</p>}
+                          {triagemData.escleroterapia_quando && <p><span className="font-medium text-surface-700">Escleroterapia quando:</span> {triagemData.escleroterapia_quando}</p>}
+                          {triagemData.observacao && <p><span className="font-medium text-surface-700">Obs triagem:</span> {triagemData.observacao}</p>}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+{/* Form */}
               <div className="card">
                 <div className="px-5 py-3 border-b border-surface-100 bg-surface-50/50 flex items-center justify-between">
                   <h3 className="font-display font-semibold text-surface-800">Prontuario</h3>
@@ -853,7 +897,103 @@ export default function ConsultorioPage() {
                   </div>
                 )}
 
-                undefinedundefined<div className="px-5 py-4 border-t border-surface-100 flex justify-between gap-2">
+                
+                <div className="px-5 pt-3 pb-0">
+                  <div className="flex gap-1 border-b border-surface-200">
+                    {[
+                      { key: 'doppler', label: 'Doppler' },
+                      { key: 'procedimento', label: 'Procedimento' },
+                      { key: 'observacao', label: 'Observacao' },
+                      { key: 'receita', label: 'Receita' },
+                    ].map(tab => (
+                      <button
+                        key={tab.key}
+                        onClick={() => setActiveTab(tab.key as any)}
+                        className={`px-4 py-2.5 text-sm font-medium transition-colors relative ${
+                          activeTab === tab.key
+                            ? 'text-brand-600 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-brand-600'
+                            : 'text-surface-500 hover:text-surface-700'
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="p-5">
+                  {activeTab === 'doppler' && (
+                    <div>
+                      <label className="block text-sm font-medium text-surface-700 mb-1.5">Doppler Vascular</label>
+                      <textarea
+                        value={(prontuario as any).doppler}
+                        onChange={e => setProntuario(p => ({ ...p, doppler: e.target.value }))}
+                        placeholder="Achados do Doppler vascular..."
+                        rows={6}
+                        className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand-400 resize-y"
+                      />
+                      <div className="mt-4">
+                        <label className="block text-sm font-medium text-surface-700 mb-1.5">Anamnese</label>
+                        <textarea
+                          value={(prontuario as any).anamnese}
+                          onChange={e => setProntuario(p => ({ ...p, anamnese: e.target.value }))}
+                          placeholder="Historia clinica, queixas, sintomas..."
+                          rows={4}
+                          className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand-400 resize-y"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {activeTab === 'procedimento' && (
+                    <div>
+                      <label className="block text-sm font-medium text-surface-700 mb-1.5">Descricao do Procedimento</label>
+                      <textarea
+                        value={(prontuario as any).descricao_procedimento}
+                        onChange={e => setProntuario(p => ({ ...p, descricao_procedimento: e.target.value }))}
+                        placeholder="Descreva o procedimento realizado..."
+                        rows={6}
+                        className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand-400 resize-y"
+                      />
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {templates.map((t, i) => (
+                          <button
+                            key={i}
+                            onClick={() => setProntuario(p => ({ ...p, descricao_procedimento: t }))}
+                            className="text-xs px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors"
+                          >
+                            Template {i + 1}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {activeTab === 'observacao' && (
+                    <div>
+                      <label className="block text-sm font-medium text-surface-700 mb-1.5">Observacoes</label>
+                      <textarea
+                        value={(prontuario as any).observacoes}
+                        onChange={e => setProntuario(p => ({ ...p, observacoes: e.target.value }))}
+                        placeholder="Observacoes adicionais..."
+                        rows={6}
+                        className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand-400 resize-y"
+                      />
+                    </div>
+                  )}
+
+                  {activeTab === 'receita' && (
+                    <div>
+                      <label className="block text-sm font-medium text-surface-700 mb-1.5">Receita</label>
+                      <textarea
+                        value={(prontuario as any).receita}
+                        onChange={e => setProntuario(p => ({ ...p, receita: e.target.value }))}
+                        placeholder="Prescricao medica..."
+                        rows={6}
+                        className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-200 focus:border-brand-400 resize-y"
+                      />
+                    </div>
+                  )}
+                </div><div className="px-5 py-4 border-t border-surface-100 flex justify-between gap-2">
                   <div className="flex gap-2 flex-wrap">
                     <button onClick={() => salvarProntuario(false)} disabled={saving} className="btn-secondary text-sm">
                       Salvar Rascunho
