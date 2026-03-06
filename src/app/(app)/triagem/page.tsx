@@ -436,6 +436,7 @@ export default function TriagemPage() {
             doppler_venoso: last.doppler_venoso,
             doppler_venoso_detalhe: last.doppler_venoso_detalhe || '',
             gravidez_amamentacao: last.gravidez_amamentacao,
+            tabagista: last.tabagista || false,
             observacao: last.observacao || '',
             data_proxima_sessao: '', // blank
           });
