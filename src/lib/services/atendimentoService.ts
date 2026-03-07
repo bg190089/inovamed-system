@@ -3,12 +3,15 @@ import type { Atendimento, Procedimento, Profissional } from '@/types';
 
 const FULL_SELECT = '*, paciente:pacientes(*), profissional:profissionais(*), procedimento:procedimentos(*), unidade:unidades(*, municipio:municipios(*))';
 
+// Lighter select for list views (polling) - no unidade join since already known from context
+const LIST_SELECT = '*, paciente:pacientes(id, nome, cpf, data_nascimento, sexo, cns), profissional:profissionais(id, nome), procedimento:procedimentos(id, nome, tipo, codigo_sus)';
+
 export class AtendimentoService {
   constructor(private supabase: SupabaseClient) {}
 
   async getFilaDoDia(unidadeId: string, profissionalId?: string): Promise<Atendimento[]> {
     const today = new Date().toISOString().split('T')[0];
-    let query = this.supabase.from('atendimentos').select(FULL_SELECT)
+    let query = this.supabase.from('atendimentos').select(LIST_SELECT)
       .eq('unidade_id', unidadeId).eq('data_atendimento', today)
       .order('hora_chegada', { ascending: true });
     if (profissionalId) {

@@ -126,7 +126,7 @@ export default function TriagemPage() {
 
   // Auto-refresh every 30s
   useEffect(() => {
-    const interval = setInterval(() => setRefreshKey(k => k + 1), 30000);
+    const interval = setInterval(() => setRefreshKey(k => k + 1), 10000);
     return () => clearInterval(interval);
   }, []);
 

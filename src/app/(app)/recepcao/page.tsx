@@ -105,7 +105,7 @@ export default function RecepcaoPage() {
   useEffect(() => {
     const interval = setInterval(() => {
       setRefreshKey(k => k + 1);
-    }, 30000);
+    }, 10000);
     return () => clearInterval(interval);
   }, []);
 

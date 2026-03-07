@@ -124,7 +124,7 @@ export default function ConsultorioPage() {
       loadFilaUnidade();
 
       // Refresh wait times every minute
-      const interval = setInterval(() => setRefreshKey(k => k + 1), 30000);
+      const interval = setInterval(() => setRefreshKey(k => k + 1), 10000);
 
       const channel = supabase
         .channel('consultorio-rt')
