@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
 
     if (puError) {
       console.error('Error deleting profissional_unidades:', puError);
-      return NextResponse.json({ error: `Erro ao limpar vÃ­nculos de unidades: ${puError.message}` }, { status: 400 });
+      return NextResponse.json({ error: `Erro ao limpar vínculos de unidades: ${puError.message}` }, { status: 400 });
     }
 
     // Delete from profissionais table
