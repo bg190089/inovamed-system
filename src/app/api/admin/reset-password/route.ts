@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
 
     const { data: caller } = await authSupabase
       .from('profissionais').select('role').eq('user_id', authUser.id).single();
-    if (!caller || caller.role !== 'admin') {
+    if (!caller || (caller.role !== 'admin' && caller.role !== 'master')) {
       return NextResponse.json({ error: 'Apenas administradores podem resetar senhas' }, { status: 403 });
     }
 
