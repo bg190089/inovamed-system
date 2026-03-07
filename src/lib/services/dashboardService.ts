@@ -9,16 +9,18 @@ export interface DashboardStats {
 export class DashboardService {
   constructor(private supabase: SupabaseClient) {}
 
-  async getStats(unidadeId: string): Promise<DashboardStats> {
+  async getStats(unidadeId: string, profissionalId?: string): Promise<DashboardStats> {
     const today = new Date().toISOString().split('T')[0];
     const comp = getCompetenciaAtual();
+    // Helper to optionally filter by profissional
+    const q = (query: any) => profissionalId ? query.eq('profissional_id', profissionalId) : query;
     const [hoje, mes, ag, fin, em, tipos] = await Promise.all([
-      this.supabase.from('atendimentos').select('*', { count: 'exact', head: true }).eq('data_atendimento', today).eq('unidade_id', unidadeId),
-      this.supabase.from('atendimentos').select('*', { count: 'exact', head: true }).eq('competencia', comp).eq('unidade_id', unidadeId),
-      this.supabase.from('atendimentos').select('*', { count: 'exact', head: true }).eq('data_atendimento', today).eq('status', 'aguardando').eq('unidade_id', unidadeId),
-      this.supabase.from('atendimentos').select('*', { count: 'exact', head: true }).eq('data_atendimento', today).eq('status', 'finalizado').eq('unidade_id', unidadeId),
-      this.supabase.from('atendimentos').select('*', { count: 'exact', head: true }).eq('data_atendimento', today).eq('status', 'em_atendimento').eq('unidade_id', unidadeId),
-      this.supabase.from('atendimentos').select('procedimento:procedimentos(tipo)').eq('competencia', comp).eq('unidade_id', unidadeId).eq('status', 'finalizado'),
+      q(this.supabase.from('atendimentos').select('*', { count: 'exact', head: true }).eq('data_atendimento', today).eq('unidade_id', unidadeId)),
+      q(this.supabase.from('atendimentos').select('*', { count: 'exact', head: true }).eq('competencia', comp).eq('unidade_id', unidadeId)),
+      q(this.supabase.from('atendimentos').select('*', { count: 'exact', head: true }).eq('data_atendimento', today).eq('status', 'aguardando').eq('unidade_id', unidadeId)),
+      q(this.supabase.from('atendimentos').select('*', { count: 'exact', head: true }).eq('data_atendimento', today).eq('status', 'finalizado').eq('unidade_id', unidadeId)),
+      q(this.supabase.from('atendimentos').select('*', { count: 'exact', head: true }).eq('data_atendimento', today).eq('status', 'em_atendimento').eq('unidade_id', unidadeId)),
+      q(this.supabase.from('atendimentos').select('procedimento:procedimentos(tipo)').eq('competencia', comp).eq('unidade_id', unidadeId).eq('status', 'finalizado')),
     ]);
     const t = tipos.data || [];
     return {

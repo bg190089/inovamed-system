@@ -22,7 +22,7 @@ export default function DashboardPage() {
   useEffect(() => {
     if (selectedUnidade) {
       setLoading(true);
-      service.getStats(selectedUnidade.id).then(setStats).finally(() => setLoading(false));
+      service.getStats(selectedUnidade.id, user?.role === 'medico' ? user.id : undefined).then(setStats).finally(() => setLoading(false));
     }
   }, [selectedUnidade, service]);
 

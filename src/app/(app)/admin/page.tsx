@@ -301,17 +301,14 @@ export default function AdminPage() {
 
   
   function deleteUnidade(u: Unidade) {
+    const senha = window.prompt('Digite a senha de confirma\u00e7\u00e3o para excluir:');
+    if (senha !== 'Margotti') { if (senha !== null) toast.error('Senha de confirma\u00e7\u00e3o incorreta.'); return; }
     confirm({
       title: 'Excluir Unidade',
       description: `Tem certeza que deseja excluir permanentemente a unidade "${u.nome}" (CNES: ${u.cnes})? Esta ação não pode ser desfeita.`,
       variant: 'danger',
       confirmLabel: 'Excluir Permanentemente',
       onConfirm: async () => {
-        const senha = window.prompt('Digite a senha de confirmação para excluir:');
-        if (senha !== 'Margotti') {
-          if (senha !== null) toast.error('Senha de confirmação incorreta.');
-          return;
-        }
         try {
           // Check if unidade has profissionais linked
           const { count } = await supabase
@@ -343,17 +340,14 @@ export default function AdminPage() {
   }
 
   function deleteMunicipio(m: Municipio) {
+    const senha = window.prompt('Digite a senha de confirma\u00e7\u00e3o para excluir:');
+    if (senha !== 'Margotti') { if (senha !== null) toast.error('Senha de confirma\u00e7\u00e3o incorreta.'); return; }
     confirm({
       title: 'Excluir Município',
       description: `Tem certeza que deseja excluir permanentemente o município "${m.nome}"? Esta ação não pode ser desfeita.`,
       variant: 'danger',
       confirmLabel: 'Excluir Permanentemente',
       onConfirm: async () => {
-        const senha = window.prompt('Digite a senha de confirmação para excluir:');
-        if (senha !== 'Margotti') {
-          if (senha !== null) toast.error('Senha de confirmação incorreta.');
-          return;
-        }
         try {
           // Check if municipio has unidades linked
           const { count } = await supabase
@@ -441,17 +435,14 @@ export default function AdminPage() {
   }
 
   function deleteProfissional(prof: Profissional) {
+    const senha = window.prompt('Digite a senha de confirma\u00e7\u00e3o para excluir:');
+    if (senha !== 'Margotti') { if (senha !== null) toast.error('Senha de confirma\u00e7\u00e3o incorreta.'); return; }
     confirm({
       title: 'Excluir Usuário',
       description: `Tem certeza que deseja excluir permanentemente o cadastro de ${prof.nome_completo}? Esta acao nao pode ser desfeita. Se o profissional possui atendimentos, prefira desativa-lo.`,
       variant: 'danger',
       confirmLabel: 'Excluir Permanentemente',
       onConfirm: async () => {
-        const senha = window.prompt('Digite a senha de confirmação para excluir:');
-        if (senha !== 'Margotti') {
-          if (senha !== null) toast.error('Senha de confirmação incorreta.');
-          return;
-        }
         try {
           const res = await fetch('/api/admin/delete-user', {
             method: 'POST',
