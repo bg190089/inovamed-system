@@ -37,14 +37,15 @@ export default function AdminPage() {
     cpf: '',
     cbo: '225203',
     crm: '',
-    role: 'medico' as UserRole
+    role: 'medico' as UserRole,
+    municipio_id: '',
   });
   const [unidadeForm, setUnidadeForm] = useState({ municipio_id: '', nome: '', cnes: '', endereco: '' });
   const [unidadeEditForm, setUnidadeEditForm] = useState({ municipio_id: '', nome: '', cnes: '', endereco: '' });
   const [munForm, setMunForm] = useState({ nome: '', codigo_ibge: '', uf: 'BA' });
 
   // Role guard - redirect if not admin
-  if (user && !hasRole('admin')) {
+  if (user && !hasRole('admin') && !hasRole('master')) {
     return (
       <div className="p-6 lg:p-8 max-w-7xl mx-auto">
         <EmptyState icon="🔒" title="Acesso Restrito" description="Voce nao tem permissao para acessar esta pagina." />
@@ -76,7 +77,7 @@ export default function AdminPage() {
       const res = await fetch('/api/admin/create-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(result.data),
+        body: JSON.stringify({...result.data, municipio_id: profForm.role === 'recepcionista' ? profForm.municipio_id : undefined}),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Erro ao criar usuário');
@@ -90,7 +91,8 @@ export default function AdminPage() {
         cpf: '',
         cbo: '225203',
         crm: '',
-        role: 'medico'
+        role: 'medico',
+        municipio_id: '',
       });
       setShowForm(false);
       loadData();
@@ -104,13 +106,14 @@ export default function AdminPage() {
   async function editProfissional() {
     if (!editingProf) return;
 
-    const updateData = {
+    const updateData: any = {
       nome_completo: profForm.nome_completo,
       crm: profForm.crm,
       cbo: profForm.cbo,
       role: profForm.role,
       cpf: profForm.cpf || null,
       cns: profForm.cns || null,
+      municipio_id: profForm.role === 'recepcionista' ? (profForm.municipio_id || null) : null,
     };
 
     setLoading(true);
@@ -122,6 +125,14 @@ export default function AdminPage() {
 
       if (error) throw error;
 
+      // If recepcionista with municipio, relink to unidades
+      if (profForm.role === 'recepcionista' && profForm.municipio_id && editingProf) {
+        await supabase.from('profissional_unidades').delete().eq('profissional_id', editingProf.id);
+        const { data: unis } = await supabase.from('unidades').select('id').eq('municipio_id', profForm.municipio_id).eq('ativo', true);
+        if (unis && unis.length > 0) {
+          await supabase.from('profissional_unidades').insert(unis.map(u => ({ profissional_id: editingProf.id, unidade_id: u.id })));
+        }
+      }
       toast.success('Usuário atualizado com sucesso');
       setEditingProf(null);
       setProfForm({
@@ -153,6 +164,7 @@ export default function AdminPage() {
       cbo: prof.cbo || '225203',
       crm: prof.crm || '',
       role: prof.role || 'medico',
+      municipio_id: (prof as any).municipio_id || '',
     });
     setTab('profissionais');
     setShowForm(false);
@@ -168,7 +180,8 @@ export default function AdminPage() {
       cpf: '',
       cbo: '225203',
       crm: '',
-      role: 'medico'
+      role: 'medico',
+      municipio_id: '',
     });
   }
 
@@ -793,10 +806,29 @@ export default function AdminPage() {
                     className="input-field"
                   >
                     <option value="admin">Administrador</option>
+                    <option value="master">Master</option>
                     <option value="medico">Medico</option>
+                    <option value="gestor">Gestor</option>
                     <option value="recepcionista">Recepcionista</option>
                   </select>
                 </div>
+                {profForm.role === 'recepcionista' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Municipio</label>
+                    <select
+                      value={profForm.municipio_id}
+                      onChange={(e) => setProfForm({ ...profForm, municipio_id: e.target.value })}
+                      className="input-field"
+                    >
+                      <option value="">Selecione um municipio</option>
+                      {municipios.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.nome} - {m.uf}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
               <div className="flex gap-3 pt-2">
                 <button onClick={() => setShowForm(false)} className="btn-secondary">Cancelar</button>

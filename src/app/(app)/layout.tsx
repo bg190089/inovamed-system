@@ -3,6 +3,7 @@
 import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import Sidebar from '@/components/layout/Sidebar';
 import ContextSelector from '@/components/layout/ContextSelector';
+import { ChangePasswordModal } from '@/components/ChangePasswordModal';
 
 function AppContent({ children }: { children: React.ReactNode }) {
   const { loading } = useAuth();
@@ -36,6 +37,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
+        <ChangePasswordModal />
       <AppContent>{children}</AppContent>
     </AuthProvider>
   );
