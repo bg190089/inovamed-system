@@ -204,11 +204,22 @@ export default function RecepcaoPage() {
         } as any);
       }
 
+      // Rule: each patient can only be registered once per day (excluding cancelled)
+      const today = new Date().toISOString().split('T')[0];
+      const jaRegistradoHoje = fila.find(
+        a => a.paciente_id === pacienteId && a.status !== 'cancelado'
+      );
+      if (jaRegistradoHoje) {
+        toast.error(`${form.nome_completo} já foi registrado(a) hoje. Cada paciente só pode ser lançado uma vez por dia.`);
+        setLoading(false);
+        return;
+      }
+
       await atendimentoService.criar({
         empresa_id: selectedEmpresa.id, unidade_id: selectedUnidade.id,
         profissional_id: selectedProf, paciente_id: pacienteId,
         procedimento_id: selectedProc,
-        data_atendimento: new Date().toISOString().split('T')[0],
+        data_atendimento: today,
         status: 'aguardando_triagem',
       });
 

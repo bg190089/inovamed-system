@@ -22,7 +22,25 @@ export class AtendimentoService {
     return data || [];
   }
 
+  async verificarDuplicataHoje(pacienteId: string, dataAtendimento: string): Promise<boolean> {
+    const { data } = await this.supabase
+      .from('atendimentos')
+      .select('id')
+      .eq('paciente_id', pacienteId)
+      .eq('data_atendimento', dataAtendimento)
+      .neq('status', 'cancelado')
+      .limit(1);
+    return (data?.length || 0) > 0;
+  }
+
   async criar(atendimento: Record<string, any>): Promise<Atendimento> {
+    // Server-side duplicate check: patient can only be registered once per day
+    if (atendimento.paciente_id && atendimento.data_atendimento) {
+      const duplicata = await this.verificarDuplicataHoje(atendimento.paciente_id, atendimento.data_atendimento);
+      if (duplicata) {
+        throw new Error('Este paciente já foi registrado hoje. Cada paciente só pode ser lançado uma vez por dia.');
+      }
+    }
     const { data, error } = await this.supabase.from('atendimentos').insert(atendimento).select().single();
     if (error) throw new Error(error.message);
     return data;

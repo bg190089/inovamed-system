@@ -6,16 +6,20 @@ import type { Empresa, Unidade } from '@/types';
 import { cn } from '@/lib/utils';
 
 export default function ContextSelector() {
-  const { empresas, unidades, selectedEmpresa, selectedUnidade, setSelectedEmpresa, setSelectedUnidade } = useAuth();
+  const { user, empresas, unidades, selectedEmpresa, selectedUnidade, setSelectedEmpresa, setSelectedUnidade } = useAuth();
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<'empresa' | 'unidade'>('empresa');
+  const isRecepcionista = user?.role === 'recepcionista';
 
   // Open automatically when no selection
   useEffect(() => {
-    if (!selectedEmpresa || !selectedUnidade) {
-      setOpen(true);
+    if (isRecepcionista) {
+      // Recepcionista only needs to select empresa
+      if (!selectedEmpresa) setOpen(true);
+    } else {
+      if (!selectedEmpresa || !selectedUnidade) setOpen(true);
     }
-  }, [selectedEmpresa, selectedUnidade]);
+  }, [selectedEmpresa, selectedUnidade, isRecepcionista]);
 
   // Listen for reopen event from Sidebar or other components
   const handleReopen = useCallback(() => {
@@ -30,6 +34,12 @@ export default function ContextSelector() {
 
   function handleSelectEmpresa(emp: Empresa) {
     setSelectedEmpresa(emp);
+    // Recepcionista: skip unidade selection, auto-select based on assigned municipio
+    if (isRecepcionista && unidades.length > 0) {
+      setSelectedUnidade(unidades[0]);
+      setOpen(false);
+      return;
+    }
     setStep('unidade');
   }
 
@@ -39,7 +49,9 @@ export default function ContextSelector() {
   }
 
   function handleClose() {
-    if (selectedEmpresa && selectedUnidade) {
+    if (isRecepcionista && selectedEmpresa) {
+      setOpen(false);
+    } else if (selectedEmpresa && selectedUnidade) {
       setOpen(false);
     }
   }
@@ -60,7 +72,7 @@ export default function ContextSelector() {
                 : 'Escolha o município/unidade de atendimento'}
             </p>
           </div>
-          {selectedEmpresa && selectedUnidade && (
+          {((isRecepcionista && selectedEmpresa) || (selectedEmpresa && selectedUnidade)) && (
             <button
               onClick={handleClose}
               className="text-white/70 hover:text-white transition-colors p-1"
@@ -142,7 +154,7 @@ export default function ContextSelector() {
           )}
         </div>
 
-        {selectedEmpresa && selectedUnidade && (
+        {((isRecepcionista && selectedEmpresa) || (selectedEmpresa && selectedUnidade)) && (
           <div className="px-6 pb-6">
             <button
               onClick={handleClose}

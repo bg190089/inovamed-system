@@ -144,7 +144,7 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
           <button
             onClick={() => window.dispatchEvent(new Event('openContextSelector'))}
             className="w-full text-left bg-surface-50 hover:bg-brand-50 rounded-lg px-3 py-2 transition-colors group cursor-pointer"
-            title="Clique para trocar empresa ou unidade"
+            title={user?.role === 'recepcionista' ? 'Clique para trocar empresa' : 'Clique para trocar empresa ou unidade'}
           >
             <div className="flex items-center justify-between">
               <p className="text-[10px] uppercase tracking-wider text-surface-400 font-semibold">Empresa</p>
@@ -164,7 +164,7 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
               </>
             )}
             <p className="text-[9px] text-brand-400 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-              Clique para alterar
+              {user?.role === 'recepcionista' ? 'Clique para trocar empresa' : 'Clique para alterar'}
             </p>
           </button>
         </div>
