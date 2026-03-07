@@ -79,9 +79,9 @@ export default function AdminPage() {
         body: JSON.stringify(result.data),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Erro ao criar profissional');
+      if (!res.ok) throw new Error(data.error || 'Erro ao criar usuário');
 
-      toast.success('Profissional criado com sucesso');
+      toast.success('Usuário criado com sucesso');
       setProfForm({
         email: '',
         password: '',
@@ -95,7 +95,7 @@ export default function AdminPage() {
       setShowForm(false);
       loadData();
     } catch (err: any) {
-      toast.error(err.message || 'Erro ao criar profissional');
+      toast.error(err.message || 'Erro ao criar usuário');
     } finally {
       setLoading(false);
     }
@@ -122,7 +122,7 @@ export default function AdminPage() {
 
       if (error) throw error;
 
-      toast.success('Profissional atualizado com sucesso');
+      toast.success('Usuário atualizado com sucesso');
       setEditingProf(null);
       setProfForm({
         email: '',
@@ -136,7 +136,7 @@ export default function AdminPage() {
       });
       loadData();
     } catch (err: any) {
-      toast.error(err.message || 'Erro ao atualizar profissional');
+      toast.error(err.message || 'Erro ao atualizar usuário');
     } finally {
       setLoading(false);
     }
@@ -351,7 +351,7 @@ export default function AdminPage() {
 
   function toggleProfissional(prof: Profissional) {
     confirm({
-      title: prof.ativo ? 'Desativar Profissional' : 'Ativar Profissional',
+      title: prof.ativo ? 'Desativar Usuário' : 'Ativar Usuário',
       description: `Confirma ${prof.ativo ? 'desativacao' : 'ativacao'} de ${prof.nome_completo}?`,
       variant: prof.ativo ? 'warning' : 'default',
       confirmLabel: prof.ativo ? 'Desativar' : 'Ativar',
@@ -366,7 +366,7 @@ export default function AdminPage() {
 
   function deleteProfissional(prof: Profissional) {
     confirm({
-      title: 'Excluir Profissional',
+      title: 'Excluir Usuário',
       description: `Tem certeza que deseja excluir permanentemente o cadastro de ${prof.nome_completo}? Esta acao nao pode ser desfeita. Se o profissional possui atendimentos, prefira desativa-lo.`,
       variant: 'danger',
       confirmLabel: 'Excluir Permanentemente',
@@ -381,17 +381,17 @@ export default function AdminPage() {
             }),
           });
           const data = await res.json();
-          if (!res.ok) throw new Error(data.error || 'Erro ao excluir profissional');
+          if (!res.ok) throw new Error(data.error || 'Erro ao excluir usuário');
 
           if (data.warning) {
             toast.warning(data.warning);
           } else {
-            toast.success('Profissional excluido com sucesso');
+            toast.success('Usuário excluído com sucesso');
           }
           loadData();
           closeConfirm();
         } catch (err: any) {
-          toast.error(err.message || 'Erro ao excluir profissional');
+          toast.error(err.message || 'Erro ao excluir usuário');
           closeConfirm();
         }
       },
@@ -399,7 +399,7 @@ export default function AdminPage() {
   }
 
   const tabs: { key: AdminTab; label: string }[] = [
-    { key: 'profissionais', label: 'Profissionais' },
+    { key: 'profissionais', label: 'Usuários' },
     { key: 'unidades', label: 'Unidades/CNES' },
     { key: 'municipios', label: 'Municipios' },
   ];
@@ -457,7 +457,7 @@ export default function AdminPage() {
         <div className="card p-6 mb-6">
           {editingProf && (
             <div className="space-y-4">
-              <h3 className="font-display font-semibold text-surface-800">Editar Profissional</h3>
+              <h3 className="font-display font-semibold text-surface-800">Editar Usuário</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="md:col-span-2">
                   <label className="input-label">E-mail</label>
@@ -497,6 +497,7 @@ export default function AdminPage() {
                     className="input-field"
                   />
                 </div>
+                {profForm.role === 'medico' && (<>
                 <div>
                   <label className="input-label">CRM</label>
                   <input
@@ -517,6 +518,7 @@ export default function AdminPage() {
                     placeholder="225203"
                   />
                 </div>
+                </>)}
                 <div>
                   <label className="input-label">Perfil de Acesso</label>
                   <select
@@ -525,7 +527,6 @@ export default function AdminPage() {
                     className="input-field"
                   >
                     <option value="admin">Administrador</option>
-                    <option value="gestor">Gestor</option>
                     <option value="medico">Medico</option>
                     <option value="recepcionista">Recepcionista</option>
                   </select>
@@ -534,7 +535,7 @@ export default function AdminPage() {
               <div className="flex gap-3 pt-2">
                 <button onClick={cancelEdit} className="btn-secondary">Cancelar</button>
                 <button onClick={editProfissional} disabled={loading} className="btn-primary">
-                  {loading ? 'Atualizando...' : 'Atualizar Profissional'}
+                  {loading ? 'Atualizando...' : 'Atualizar Usuário'}
                 </button>
               </div>
             </div>
@@ -640,7 +641,7 @@ export default function AdminPage() {
 
           {tab === 'profissionais' && !editingProf && (
             <div className="space-y-4">
-              <h3 className="font-display font-semibold text-surface-800">Novo Profissional</h3>
+              <h3 className="font-display font-semibold text-surface-800">Novo Usuário</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className="input-label">E-mail (login)</label>
@@ -690,6 +691,7 @@ export default function AdminPage() {
                     className="input-field"
                   />
                 </div>
+                {profForm.role === 'medico' && (<>
                 <div>
                   <label className="input-label">CRM</label>
                   <input
@@ -710,6 +712,7 @@ export default function AdminPage() {
                     placeholder="225203"
                   />
                 </div>
+                </>)}
                 <div>
                   <label className="input-label">Perfil de Acesso</label>
                   <select
@@ -718,7 +721,6 @@ export default function AdminPage() {
                     className="input-field"
                   >
                     <option value="admin">Administrador</option>
-                    <option value="gestor">Gestor</option>
                     <option value="medico">Medico</option>
                     <option value="recepcionista">Recepcionista</option>
                   </select>
