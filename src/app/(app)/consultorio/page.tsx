@@ -13,8 +13,8 @@ import type { Atendimento } from '@/types';
 
 // Helper: Calculate wait time in minutes from hora_chegada
 function calcWaitTime(hora_chegada: string | null): string {
-  if (!hora_chegada) return 'â';
-  const diff = Math.floor((Date.now() - new Date(hora_chegada).getTime()) / 60000);
+  if (!hora_chegada) return '—';
+  const diff = Math.floor((Date.now() - new Date(hora_chegada).getTime()) / 10000);
   if (diff < 1) return '<1 min';
   if (diff >= 60) return `${Math.floor(diff / 60)}h${diff % 60}min`;
   return `${diff} min`;
@@ -22,11 +22,11 @@ function calcWaitTime(hora_chegada: string | null): string {
 
 // Helper: Get priority badge for age
 function getAgePriority(dataNascimento: string | null): { age: number; badge: string; color: string; label: string } {
-  if (!dataNascimento) return { age: 0, badge: 'â', color: '', label: '' };
+  if (!dataNascimento) return { age: 0, badge: '—', color: '', label: '' };
   const age = calcularIdade(dataNascimento);
-  if (age >= 60) return { age, badge: 'ð´', color: 'text-red-600', label: 'PRIOR.' };
-  if (age < 12) return { age, badge: 'ð ', color: 'text-orange-600', label: 'CRIANÃA' };
-  if (age < 18) return { age, badge: 'ð¡', color: 'text-yellow-600', label: '' };
+  if (age >= 60) return { age, badge: '🔴', color: 'text-red-600', label: 'PRIOR.' };
+  if (age < 12) return { age, badge: '🟠', color: 'text-orange-600', label: 'CRIANÇA' };
+  if (age < 18) return { age, badge: '🟡', color: 'text-yellow-600', label: '' };
   return { age, badge: '', color: '', label: '' };
 }
 
@@ -270,7 +270,7 @@ export default function ConsultorioPage() {
       }
       await service.salvarProntuario(atendimentoAtual.id, prontuarioData, finalizar);
       if (finalizar) {
-        // Backup assÃ­ncrono no Google Drive (fire-and-forget)
+        // Backup assíncrono no Google Drive (fire-and-forget)
         fetch('/api/drive/backup-prontuario', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -279,7 +279,7 @@ export default function ConsultorioPage() {
           .then((r) => r.json())
           .then((res) => {
             if (res.success) {
-              toast.success('Backup do prontuÃ¡rio salvo no Google Drive');
+              toast.success('Backup do prontuário salvo no Google Drive');
             }
           })
           .catch(() => {});
@@ -526,7 +526,7 @@ function addDopplerTemplate() {
     <div className="p-6 lg:p-8 max-w-7xl mx-auto pt-16 lg:pt-0">
       <PageHeader
         title="Consultorio"
-        subtitle={`Dr(a). ${(user?.nome_completo || '').replace(/^(DR\.?|DRA\.?)\s*/i, '').split(' ').filter(Boolean).slice(0, 2).map(w => w.charAt(0) + w.slice(1).toLowerCase()).join(' ')} â¢ ${(selectedUnidade as any)?.municipio?.nome || 'â'} â¢ ${formatDate(new Date(), 'dd/MM/yyyy')}`}
+        subtitle={`Dr(a). ${(user?.nome_completo || '').replace(/^(DR\.?|DRA\.?)\s*/i, '').split(' ').filter(Boolean).slice(0, 2).map(w => w.charAt(0) + w.slice(1).toLowerCase()).join(' ')} • ${(selectedUnidade as any)?.municipio?.nome || '—'} • ${formatDate(new Date(), 'dd/MM/yyyy')}`}
       />
 
       {/* Queue Summary Cards */}
@@ -620,7 +620,7 @@ function addDopplerTemplate() {
                             <div className="flex items-center gap-1 text-xs text-surface-500">
                               <span className={agePriority.color}>{agePriority.age}a {agePriority.badge}</span>
                               {agePriority.label && <span className={`text-[10px] font-semibold ${agePriority.color}`}>{agePriority.label}</span>}
-                              <span>â¢</span>
+                              <span>•</span>
                               <span>{calcWaitTime(atend.hora_chegada)}</span>
                             </div>
                           </div>
@@ -652,8 +652,8 @@ function addDopplerTemplate() {
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium text-surface-800 truncate">{atend.paciente?.nome_completo}</p>
                               <p className="text-xs text-surface-500 mt-0.5">
-                                {agePriority.age}a â¢ {atend.procedimento?.tipo === 'bilateral' ? 'Bilateral' : 'Unilateral'}
-                                {atend.reabertura_count ? ` â¢ Reaberto ${atend.reabertura_count}x` : ''}
+                                {agePriority.age}a • {atend.procedimento?.tipo === 'bilateral' ? 'Bilateral' : 'Unilateral'}
+                                {atend.reabertura_count ? ` • Reaberto ${atend.reabertura_count}x` : ''}
                               </p>
                             </div>
                             <div className="flex gap-1.5 flex-shrink-0">
@@ -694,7 +694,7 @@ function addDopplerTemplate() {
           {!atendimentoAtual ? (
             <div className="card">
               <EmptyState
-                icon="ð"
+                icon="📋"
                 title="Selecione um paciente da fila"
                 description="Clique em um paciente para iniciar o atendimento"
               />
@@ -705,7 +705,7 @@ function addDopplerTemplate() {
               {sessoesPaciente >= 4 && (
                 <div className="card p-3 bg-red-50 border border-red-200">
                   <div className="flex items-center gap-2">
-                    <span className="text-red-600 text-lg">â ï¸</span>
+                    <span className="text-red-600 text-lg">⚠️</span>
                     <div>
                       <p className="text-sm font-bold text-red-700">ALERTA: {sessoesPaciente}a sessao em menos de 12 meses</p>
                       <p className="text-xs text-red-600">Paciente atingiu o limite de sessoes. Verificar necessidade clinica.</p>
@@ -728,19 +728,16 @@ function addDopplerTemplate() {
                           Sessão {sessoesPaciente} de 4
                         </span>
                       )}
-                      {atendimentoAtual.procedimento?.tipo && (
-                        <span className={cn(
-                          'ml-2 text-xs font-semibold px-2 py-0.5 rounded-full',
-                          atendimentoAtual.procedimento.tipo === 'bilateral' ? 'bg-purple-100 text-purple-700' : 'bg-teal-100 text-teal-700'
-                        )}>
-                          {atendimentoAtual.procedimento.tipo === 'bilateral' ? 'Bilateral' : 'Unilateral'}
-                        </span>
-                      )}
+                    {selectedAtend?.procedimento_tipo && (
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${selectedAtend.procedimento_tipo === 'bilateral' ? 'bg-purple-100 text-purple-800' : 'bg-teal-100 text-teal-800'}`}>
+                        {selectedAtend.procedimento_tipo === 'bilateral' ? 'Bilateral' : 'Unilateral'}
+                      </span>
+                    )}
                     </h3>
                     <p className="text-sm text-surface-500 mt-0.5">
-                      {calcularIdade(atendimentoAtual.paciente?.data_nascimento || '')} anos â¢{' '}
-                      {atendimentoAtual.paciente?.sexo === 'F' ? 'Feminino' : 'Masculino'} â¢ CPF:{' '}
-                      {maskCPF(atendimentoAtual.paciente?.cpf || '')} â¢ Nasc:{' '}
+                      {calcularIdade(atendimentoAtual.paciente?.data_nascimento || '')} anos •{' '}
+                      {atendimentoAtual.paciente?.sexo === 'F' ? 'Feminino' : 'Masculino'} • CPF:{' '}
+                      {maskCPF(atendimentoAtual.paciente?.cpf || '')} • Nasc:{' '}
                       {formatDate(atendimentoAtual.paciente?.data_nascimento || '', 'dd/MM/yyyy')}
                     </p>
                   </div>
@@ -762,7 +759,7 @@ function addDopplerTemplate() {
                       <div key={h.id} className="bg-surface-50 rounded-lg p-3">
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-xs font-semibold text-surface-600">
-                            {formatDate(h.data_atendimento, 'dd/MM/yyyy')} â¢ {(h.unidade as any)?.municipio?.nome}
+                            {formatDate(h.data_atendimento, 'dd/MM/yyyy')} • {(h.unidade as any)?.municipio?.nome}
                           </span>
                           <span className="badge bg-surface-200 text-surface-600 text-[10px]">
                             {h.procedimento?.tipo === 'bilateral' ? 'Bilateral' : 'Unilateral'}

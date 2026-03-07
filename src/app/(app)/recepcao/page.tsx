@@ -15,7 +15,7 @@ import type { Paciente, Atendimento, Procedimento, Profissional } from '@/types'
 
 // Helper: Calculate wait time in human readable format
 function calcWaitTime(hora_chegada: string | null): string {
-  if (!hora_chegada) return 'â';
+  if (!hora_chegada) return '—';
   const diff = Math.floor((Date.now() - new Date(hora_chegada).getTime()) / 60000);
   if (diff < 1) return '<1 min';
   if (diff >= 60) {
@@ -39,9 +39,9 @@ function getWaitTimeColor(hora_chegada: string | null): string {
 // Helper: Get priority badge based on age
 function getPriorityBadge(dataNascimento: string): { label: string; className: string; emoji: string } | null {
   const age = calcularIdade(dataNascimento);
-  if (age >= 60) return { label: 'PRIORITÃRIO', className: 'bg-red-100 text-red-700', emoji: 'ð´' };
-  if (age < 12) return { label: 'CRIANÃA', className: 'bg-orange-100 text-orange-700', emoji: 'ð ' };
-  if (age < 18) return { label: 'ADOLESCENTE', className: 'bg-yellow-100 text-yellow-700', emoji: 'ð¡' };
+  if (age >= 60) return { label: 'PRIORITÁRIO', className: 'bg-red-100 text-red-700', emoji: '🔴' };
+  if (age < 12) return { label: 'CRIANÇA', className: 'bg-orange-100 text-orange-700', emoji: '🟠' };
+  if (age < 18) return { label: 'ADOLESCENTE', className: 'bg-yellow-100 text-yellow-700', emoji: '🟡' };
   return null;
 }
 
@@ -61,6 +61,7 @@ export default function RecepcaoPage() {
   const [procedimentos, setProcedimentos] = useState<Procedimento[]>([]);
   const [profissionais, setProfissionais] = useState<Profissional[]>([]);
   const [loading, setLoading] = useState(false);
+  const [sessoesPaciente, setSessoesPaciente] = useState(0);
   const [selectedProc, setSelectedProc] = useState('');
   const [selectedProf, setSelectedProf] = useState('');
   const [isNewPatient, setIsNewPatient] = useState(false);
@@ -68,7 +69,6 @@ export default function RecepcaoPage() {
 
   const [editingAtendimento, setEditingAtendimento] = useState<Atendimento | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [sessoesPaciente, setSessoesPaciente] = useState(0);
   const [editForm, setEditForm] = useState({
     nome_completo: '', sexo: 'F' as 'M' | 'F', data_nascimento: '',
     cpf: '', cns: '', cep: '', logradouro: '', numero: '', complemento: '',
@@ -106,31 +106,26 @@ export default function RecepcaoPage() {
   useEffect(() => {
     const interval = setInterval(() => {
       setRefreshKey(k => k + 1);
-    }, 30000);
+    }, 10000);
     return () => clearInterval(interval);
   }, []);
-
-  // Fetch session count when patient is selected
-  useEffect(() => {
-    if (selectedPaciente?.id) {
-      (async () => {
-        const sessoes = await atendimentoService.contarSessoes12Meses(selectedPaciente.id);
-        let total = sessoes;
-        if (selectedPaciente.sessoes_anteriores && Array.isArray(selectedPaciente.sessoes_anteriores)) {
-          total += selectedPaciente.sessoes_anteriores.length;
-        }
-        setSessoesPaciente(total);
-      })();
-    } else {
-      setSessoesPaciente(0);
-    }
-  }, [selectedPaciente, atendimentoService]);
 
   useEffect(() => {
     if (selectedUnidade) {
       atendimentoService.getProcedimentos().then(setProcedimentos);
       atendimentoService.getMedicos().then(setProfissionais);
       loadFila();
+
+  // Contar sessões do paciente selecionado
+  useEffect(() => {
+    if (!selectedPaciente) { setSessoesPaciente(0); return; }
+    (async () => {
+      const count12 = await AtendimentoService.contarSessoes12Meses(supabase, selectedPaciente.id);
+      const ant = selectedPaciente.sessoes_anteriores?.length || 0;
+      setSessoesPaciente(count12 + ant);
+    })();
+  }, [selectedPaciente, supabase]);
+
 
       // Filtered realtime subscription
       const channel = supabase
@@ -544,7 +539,7 @@ export default function RecepcaoPage() {
     <div className="p-4 lg:p-8 max-w-7xl mx-auto pt-16 lg:pt-0">
       <PageHeader
         title="Recepcao"
-        subtitle={`${(selectedUnidade as any)?.municipio?.nome || 'â'} â¢ ${formatDate(new Date(), 'dd/MM/yyyy')} â¢ ${fila.length} pacientes hoje`}
+        subtitle={`${(selectedUnidade as any)?.municipio?.nome || '—'} • ${formatDate(new Date(), 'dd/MM/yyyy')} • ${fila.length} pacientes hoje`}
         action={
           <button onClick={() => setShowModal(true)} className="btn-primary text-sm">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
@@ -607,7 +602,7 @@ export default function RecepcaoPage() {
         </div>
 
         {filaTabFiltrada.length === 0 ? (
-          <EmptyState icon="ð¥" title={filaTab === 'aguardando' ? 'Nenhum paciente aguardando' : 'Nenhum paciente finalizado'} description={filaTab === 'aguardando' ? 'Clique em "Novo Atendimento" para comeÃ§ar' : 'Nenhum atendimento foi finalizado ainda'} />
+          <EmptyState icon="🏥" title={filaTab === 'aguardando' ? 'Nenhum paciente aguardando' : 'Nenhum paciente finalizado'} description={filaTab === 'aguardando' ? 'Clique em "Novo Atendimento" para começar' : 'Nenhum atendimento foi finalizado ainda'} />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -616,11 +611,11 @@ export default function RecepcaoPage() {
                 <th className="px-4 py-3 text-left">Paciente</th>
                 <th className="px-4 py-3 text-left">Idade / Prior.</th>
                 <th className="px-4 py-3 text-left">Procedimento</th>
-                <th className="px-4 py-3 text-left">MÃ©dico</th>
+                <th className="px-4 py-3 text-left">Médico</th>
                 <th className="px-4 py-3 text-left">Chegada</th>
                 {filaTab === 'aguardando' && <th className="px-4 py-3 text-left">Espera</th>}
                 <th className="px-4 py-3 text-center">Status</th>
-                <th className="px-4 py-3 text-center w-16">AÃ§Ãµes</th>
+                <th className="px-4 py-3 text-center w-16">Ações</th>
               </tr></thead>
               <tbody>
                 {filaTabFiltrada.map((atend, i) => {
@@ -648,7 +643,7 @@ export default function RecepcaoPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-sm text-surface-600">Dr(a). {atend.profissional?.nome_completo?.split(' ')[0]}</td>
-                      <td className="px-4 py-3 text-sm text-surface-500">{atend.hora_chegada ? formatDate(atend.hora_chegada, 'HH:mm') : 'â'}</td>
+                      <td className="px-4 py-3 text-sm text-surface-500">{atend.hora_chegada ? formatDate(atend.hora_chegada, 'HH:mm') : '—'}</td>
                       {filaTab === 'aguardando' && (
                         <td className={cn('px-4 py-3 text-sm', getWaitTimeColor(atend.hora_chegada))}>
                           {calcWaitTime(atend.hora_chegada)}
@@ -710,7 +705,7 @@ export default function RecepcaoPage() {
         </div>
 
         {filaTabFiltrada.length === 0 ? (
-          <EmptyState icon="ð¥" title={filaTab === 'aguardando' ? 'Nenhum paciente aguardando' : 'Nenhum paciente finalizado'} description={filaTab === 'aguardando' ? 'Clique em "Novo Atendimento" para comeÃ§ar' : 'Nenhum atendimento foi finalizado ainda'} />
+          <EmptyState icon="🏥" title={filaTab === 'aguardando' ? 'Nenhum paciente aguardando' : 'Nenhum paciente finalizado'} description={filaTab === 'aguardando' ? 'Clique em "Novo Atendimento" para começar' : 'Nenhum atendimento foi finalizado ainda'} />
         ) : (
           <>
             {filaTab === 'aguardando' && (
@@ -733,7 +728,7 @@ export default function RecepcaoPage() {
                         </div>
                         <div className="text-center flex-shrink-0">
                           <p className="text-2xl font-bold text-amber-600">{position}</p>
-                          <p className="text-xs text-surface-500">posiÃ§Ã£o</p>
+                          <p className="text-xs text-surface-500">posição</p>
                         </div>
                       </div>
 
@@ -752,12 +747,12 @@ export default function RecepcaoPage() {
                           <p className="font-medium text-surface-700">{atend.procedimento?.tipo === 'bilateral' ? 'Bilateral' : 'Unilateral'}</p>
                         </div>
                         <div>
-                          <p className="text-surface-500">MÃ©dico</p>
+                          <p className="text-surface-500">Médico</p>
                           <p className="font-medium text-surface-700">Dr(a). {atend.profissional?.nome_completo?.split(' ')[0]}</p>
                         </div>
                         <div>
                           <p className="text-surface-500">Chegada</p>
-                          <p className="font-medium text-surface-700">{atend.hora_chegada ? formatDate(atend.hora_chegada, 'HH:mm') : 'â'}</p>
+                          <p className="font-medium text-surface-700">{atend.hora_chegada ? formatDate(atend.hora_chegada, 'HH:mm') : '—'}</p>
                         </div>
                         <div>
                           <p className="text-surface-500">Espera</p>
@@ -819,7 +814,7 @@ export default function RecepcaoPage() {
                               <p className="font-medium text-surface-700">{atend.procedimento?.tipo === 'bilateral' ? 'Bilateral' : 'Unilateral'}</p>
                             </div>
                             <div>
-                              <p className="text-surface-500">MÃ©dico</p>
+                              <p className="text-surface-500">Médico</p>
                               <p className="font-medium text-surface-700">Dr(a). {atend.profissional?.nome_completo?.split(' ')[0]}</p>
                             </div>
                           </div>
@@ -862,7 +857,7 @@ export default function RecepcaoPage() {
                               <p className="font-medium text-surface-700">{atend.procedimento?.tipo === 'bilateral' ? 'Bilateral' : 'Unilateral'}</p>
                             </div>
                             <div>
-                              <p className="text-surface-500">MÃ©dico</p>
+                              <p className="text-surface-500">Médico</p>
                               <p className="font-medium text-surface-700">Dr(a). {atend.profissional?.nome_completo?.split(' ')[0]}</p>
                             </div>
                           </div>
@@ -910,7 +905,7 @@ export default function RecepcaoPage() {
                           <p className="font-medium text-surface-700">{atend.procedimento?.tipo === 'bilateral' ? 'Bilateral' : 'Unilateral'}</p>
                         </div>
                         <div>
-                          <p className="text-surface-500">MÃ©dico</p>
+                          <p className="text-surface-500">Médico</p>
                           <p className="font-medium text-surface-700">Dr(a). {atend.profissional?.nome_completo?.split(' ')[0]}</p>
                         </div>
                       </div>
@@ -975,7 +970,7 @@ export default function RecepcaoPage() {
                 {qrDataUrl && (
                   <div className="flex flex-col items-center gap-3 bg-surface-50 p-4 rounded-lg">
                     <img src={qrDataUrl} alt="QR Code" className="w-48 h-48" />
-                    <p className="text-xs text-surface-500 text-center">Aponte a cÃ¢mera do telefone para fazer upload</p>
+                    <p className="text-xs text-surface-500 text-center">Aponte a câmera do telefone para fazer upload</p>
                   </div>
                 )}
               </div>
@@ -1149,20 +1144,6 @@ export default function RecepcaoPage() {
                       <div>
                         <p className="font-semibold text-brand-800">{selectedPaciente.nome_completo}</p>
                         <p className="text-sm text-brand-600">CPF: {maskCPF(selectedPaciente.cpf || '')} | {calcularIdade(selectedPaciente.data_nascimento)}a</p>
-                        {sessoesPaciente > 0 && (
-                          <div className="flex gap-2 mt-1.5">
-                            <span className={
-                              sessoesPaciente >= 4 ? 'text-xs font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700' : 'text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700'
-                            }>
-                              Sessão {sessoesPaciente} de 4
-                            </span>
-                            {sessoesPaciente >= 4 && (
-                              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700">
-                                ⚠️ Limite atingido
-                              </span>
-                            )}
-                          </div>
-                        )}
                       </div>
                       <button onClick={() => { setSelectedPaciente(null); setIsNewPatient(false); }} className="text-sm text-brand-600 hover:text-brand-800 font-medium">Trocar</button>
                     </div>
@@ -1172,7 +1153,7 @@ export default function RecepcaoPage() {
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <h3 className="font-semibold text-surface-800">Dados do Paciente</h3>
-                        <button onClick={() => { setIsNewPatient(false); setSelectedPaciente(null); }} className="text-sm text-surface-500 hover:text-surface-700">â Voltar a busca</button>
+                        <button onClick={() => { setIsNewPatient(false); setSelectedPaciente(null); }} className="text-sm text-surface-500 hover:text-surface-700">← Voltar a busca</button>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div className="md:col-span-2">
@@ -1220,7 +1201,7 @@ export default function RecepcaoPage() {
                         </div>
                         <div>
                           <label className="input-label">Numero</label>
-                          <input type="text" value={form.numero} onChange={(e) => setForm({ ...form, numero: e.target.value })} className="input-field" placeholder="NÂº" />
+                          <input type="text" value={form.numero} onChange={(e) => setForm({ ...form, numero: e.target.value })} className="input-field" placeholder="Nº" />
                         </div>
                         <div>
                           <label className="input-label">Complemento</label>

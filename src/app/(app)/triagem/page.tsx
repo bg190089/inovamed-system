@@ -61,11 +61,11 @@ export default function TriagemPage() {
   const [historico, setHistorico] = useState<Triagem[]>([]);
   const [showHistorico, setShowHistorico] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [sessoesPaciente, setSessoesPaciente] = useState(0);
   const [saving, setSaving] = useState(false);
   const [medicos, setMedicos] = useState<Profissional[]>([]);
   const [procedimentos, setProcedimentos] = useState<any[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [sessoesPaciente, setSessoesPaciente] = useState(0);
 
   // Nova triagem avulsa
   const [showNovaTriagem, setShowNovaTriagem] = useState(false);
@@ -112,6 +112,19 @@ export default function TriagemPage() {
     if (selectedUnidade) {
       loadFila();
       atendimentoService.getMedicos().then(setMedicos);
+
+  // Contar sessões do paciente
+  useEffect(() => {
+    const pacId = selectedAtend?.paciente_id || pacienteAvulso?.id;
+    if (!pacId) { setSessoesPaciente(0); return; }
+    (async () => {
+      const count12 = await AtendimentoService.contarSessoes12Meses(supabase, pacId);
+      const pac = selectedAtend?.paciente || pacienteAvulso;
+      const ant = pac?.sessoes_anteriores?.length || 0;
+      setSessoesPaciente(count12 + ant);
+    })();
+  }, [selectedAtend, pacienteAvulso, supabase]);
+
       agendamentoService.getProcedimentos().then(setProcedimentos);
       // Realtime
       const channel = supabase
@@ -127,27 +140,9 @@ export default function TriagemPage() {
 
   // Auto-refresh every 30s
   useEffect(() => {
-    const interval = setInterval(() => setRefreshKey(k => k + 1), 30000);
+    const interval = setInterval(() => setRefreshKey(k => k + 1), 10000);
     return () => clearInterval(interval);
   }, []);
-
-  // Fetch session count when patient is selected
-  useEffect(() => {
-    const pid = selectedAtend?.paciente_id || pacienteAvulso?.id;
-    if (pid) {
-      (async () => {
-        const sessoes = await atendimentoService.contarSessoes12Meses(pid);
-        const pac = selectedAtend?.paciente || pacienteAvulso;
-        let total = sessoes;
-        if (pac?.sessoes_anteriores && Array.isArray(pac.sessoes_anteriores)) {
-          total += pac.sessoes_anteriores.length;
-        }
-        setSessoesPaciente(total);
-      })();
-    } else {
-      setSessoesPaciente(0);
-    }
-  }, [selectedAtend, pacienteAvulso, atendimentoService]);
 
   // Busca de paciente para triagem avulsa (debounced)
   useEffect(() => {
@@ -251,7 +246,7 @@ export default function TriagemPage() {
       setTcleIp(data.ip || '');
     } catch { setTcleIp(''); }
 
-    // Buscar mÃ©dico do dia via escala
+    // Buscar médico do dia via escala
     try {
       const today = new Date().toISOString().split('T')[0];
       const municipioNome = (selectedUnidade as any)?.municipio?.nome || '';
@@ -283,7 +278,7 @@ export default function TriagemPage() {
 
   async function handleAssinarTcle() {
     if (!sigCanvasRef.current || sigCanvasRef.current.isEmpty()) {
-      toast.error('Assinatura do paciente Ã© obrigatÃ³ria');
+      toast.error('Assinatura do paciente é obrigatória');
       return;
     }
     if (!tclePaciente) return;
@@ -292,7 +287,7 @@ export default function TriagemPage() {
     try {
       const assinaturaBase64 = sigCanvasRef.current.toDataURL('image/png');
 
-      // Montar endereÃ§o
+      // Montar endereço
       const pac = tclePaciente;
       let endereco = '';
       if (pac.logradouro) {
@@ -487,7 +482,7 @@ export default function TriagemPage() {
           await atendimentoService.atualizarStatus(selectedAtend.id, 'aguardando', {
             triagem_id: triagem.id,
           });
-          toast.success(`${selectedAtend.paciente?.nome_completo} encaminhado(a) para o mÃ©dico`);
+          toast.success(`${selectedAtend.paciente?.nome_completo} encaminhado(a) para o médico`);
         } else {
           await supabase.from('atendimentos').update({ triagem_id: triagem.id }).eq('id', selectedAtend.id);
           toast.success('Triagem salva');
@@ -542,7 +537,7 @@ export default function TriagemPage() {
   const _ = refreshKey;
 
   function calcWaitTime(hora: string | null): string {
-    if (!hora) return 'â';
+    if (!hora) return '—';
     const diff = Math.floor((Date.now() - new Date(hora).getTime()) / 60000);
     if (diff < 1) return '<1 min';
     if (diff >= 60) { const h = Math.floor(diff / 60); const m = diff % 60; return m > 0 ? `${h}h${String(m).padStart(2,'0')}min` : `${h}h`; }
@@ -554,7 +549,7 @@ export default function TriagemPage() {
       <div className="flex items-center justify-between mb-6">
         <PageHeader
           title="Triagem"
-          subtitle={`${(selectedUnidade as any)?.municipio?.nome || 'â'} â¢ ${formatDate(new Date(), 'dd/MM/yyyy')} â¢ ${fila.length} pacientes aguardando`}
+          subtitle={`${(selectedUnidade as any)?.municipio?.nome || '—'} • ${formatDate(new Date(), 'dd/MM/yyyy')} • ${fila.length} pacientes aguardando`}
         />
         <button
           onClick={() => { setShowNovaTriagem(!showNovaTriagem); setSelectedAtend(null); setPacienteAvulso(null); setShowCadastroPaciente(false); setForm(EMPTY_FORM); setHistorico([]); }}
@@ -688,7 +683,7 @@ export default function TriagemPage() {
                   <label className="block text-xs font-medium text-surface-600 mb-1">Numero</label>
                   <input type="text" value={novoPaciente.numero}
                     onChange={e => setNovoPaciente(p => ({ ...p, numero: e.target.value }))}
-                    placeholder="NÂº"
+                    placeholder="Nº"
                     className="w-full px-3 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400" />
                 </div>
                 <div>
@@ -729,7 +724,7 @@ export default function TriagemPage() {
         </div>
       )}
 
-      {/* TRIAGEM AVULSA - FormulÃ¡rio completo quando paciente selecionado */}
+      {/* TRIAGEM AVULSA - Formulário completo quando paciente selecionado */}
       {showNovaTriagem && pacienteAvulso && (
         <div className="bg-white rounded-xl border-2 border-emerald-200 overflow-hidden mb-6">
           {/* Patient Header */}
@@ -741,25 +736,10 @@ export default function TriagemPage() {
                 </div>
                 <h2 className="text-lg font-bold text-surface-900 mt-1">{pacienteAvulso.nome_completo}</h2>
                 <div className="flex items-center gap-3 mt-1 text-sm text-surface-500">
-                  {pacienteAvulso.data_nascimento && <span>{calcularIdade(pacienteAvulso.data_nascimento)}a â¢ {formatDate(pacienteAvulso.data_nascimento)}</span>}
-                  <span>â¢ {pacienteAvulso.sexo === 'F' ? 'Feminino' : 'Masculino'}</span>
-                  {pacienteAvulso.cpf && <span>â¢ CPF: {maskCPF(pacienteAvulso.cpf)}</span>}
-                
-                {sessoesPaciente > 0 && (
-                  <div className="flex gap-2 mt-2">
-                    <span className={
-                      sessoesPaciente >= 4 ? 'text-xs font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700' : 'text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700'
-                    }>
-                      Sessão {sessoesPaciente} de 4
-                    </span>
-                    {sessoesPaciente >= 4 && (
-                      <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700">
-                        ⚠️ Limite atingido
-                      </span>
-                    )}
-                  </div>
-                )}
-</div>
+                  {pacienteAvulso.data_nascimento && <span>{calcularIdade(pacienteAvulso.data_nascimento)}a • {formatDate(pacienteAvulso.data_nascimento)}</span>}
+                  <span>• {pacienteAvulso.sexo === 'F' ? 'Feminino' : 'Masculino'}</span>
+                  {pacienteAvulso.cpf && <span>• CPF: {maskCPF(pacienteAvulso.cpf)}</span>}
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 {historico.length > 0 && (
@@ -786,7 +766,7 @@ export default function TriagemPage() {
               {historico.map((h) => (
                 <div key={h.id} className="text-xs text-amber-700 mb-1">
                   <span className="font-medium">{formatDate(h.created_at, 'dd/MM/yyyy HH:mm')}</span>
-                  {' â '}PA: {h.pressao_arterial || 'â'} | HGT: {h.hgt || 'â'}
+                  {' — '}PA: {h.pressao_arterial || '—'} | HGT: {h.hgt || '—'}
                   {h.observacao && ` | Obs: ${h.observacao}`}
                 </div>
               ))}
@@ -893,13 +873,13 @@ export default function TriagemPage() {
                       <div className="flex items-center justify-between">
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium text-surface-800 truncate">
-                            {pac?.nome_completo || 'â'}
+                            {pac?.nome_completo || '—'}
                           </p>
                           <div className="flex items-center gap-2 mt-0.5">
                             {age !== null && (
                               <span className="text-xs text-surface-500">{age}a</span>
                             )}
-                            <span className="text-xs text-surface-400">â¢</span>
+                            <span className="text-xs text-surface-400">•</span>
                             <span className="text-xs text-surface-500">
                               {atend.procedimento?.tipo === 'bilateral' ? 'Bilateral' : 'Unilateral'}
                             </span>
@@ -940,11 +920,11 @@ export default function TriagemPage() {
                     </h2>
                     <div className="flex items-center gap-3 mt-1 text-sm text-surface-500">
                       {paciente?.data_nascimento && (
-                        <span>{calcularIdade(paciente.data_nascimento)}a â¢ {formatDate(paciente.data_nascimento)}</span>
+                        <span>{calcularIdade(paciente.data_nascimento)}a • {formatDate(paciente.data_nascimento)}</span>
                       )}
-                      <span>â¢ {paciente?.sexo === 'F' ? 'Feminino' : 'Masculino'}</span>
-                      {paciente?.cpf && <span>â¢ CPF: {maskCPF(paciente.cpf)}</span>}
-                      {paciente?.telefone && <span>â¢ {maskPhone(paciente.telefone)}</span>}
+                      <span>• {paciente?.sexo === 'F' ? 'Feminino' : 'Masculino'}</span>
+                      {paciente?.cpf && <span>• CPF: {maskCPF(paciente.cpf)}</span>}
+                      {paciente?.telefone && <span>• {maskPhone(paciente.telefone)}</span>}
                     </div>
                     {paciente?.logradouro && (
                       <p className="text-xs text-surface-400 mt-1">
@@ -954,22 +934,7 @@ export default function TriagemPage() {
                     {paciente?.cns && (
                       <p className="text-xs text-surface-400">Cartao SUS: {paciente.cns}</p>
                     )}
-                  
-                {sessoesPaciente > 0 && (
-                  <div className="flex gap-2 mt-2">
-                    <span className={
-                      sessoesPaciente >= 4 ? 'text-xs font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700' : 'text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700'
-                    }>
-                      Sessão {sessoesPaciente} de 4
-                    </span>
-                    {sessoesPaciente >= 4 && (
-                      <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700">
-                        ⚠️ Limite atingido
-                      </span>
-                    )}
                   </div>
-                )}
-</div>
                   <div className="flex items-center gap-2">
                     {historico.length > 0 && (
                       <button
@@ -1002,7 +967,7 @@ export default function TriagemPage() {
                   {historico.map((h, i) => (
                     <div key={h.id} className="text-xs text-amber-700 mb-1">
                       <span className="font-medium">{formatDate(h.created_at, 'dd/MM/yyyy HH:mm')}</span>
-                      {' â '}PA: {h.pressao_arterial || 'â'} | HGT: {h.hgt || 'â'}
+                      {' — '}PA: {h.pressao_arterial || '—'} | HGT: {h.hgt || '—'}
                       {h.observacao && ` | Obs: ${h.observacao}`}
                     </div>
                   ))}
@@ -1242,15 +1207,15 @@ export default function TriagemPage() {
                 </div>
               </div>
 
-              {/* MÃ©dico do Dia */}
+              {/* Médico do Dia */}
               <div className={cn('rounded-lg p-3 border', tcleMedico ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200')}>
-                <h3 className={cn('text-xs font-bold mb-1', tcleMedico ? 'text-emerald-800' : 'text-amber-800')}>MÃDICO(A) RESPONSÃVEL</h3>
+                <h3 className={cn('text-xs font-bold mb-1', tcleMedico ? 'text-emerald-800' : 'text-amber-800')}>MÉDICO(A) RESPONSÁVEL</h3>
                 {tcleMedico ? (
                   <p className="text-sm font-medium text-surface-800">
-                    Dr(a). {tcleMedico.nome} {tcleMedico.crm && <span className="text-xs text-surface-500">â CRM/BA {tcleMedico.crm}</span>}
+                    Dr(a). {tcleMedico.nome} {tcleMedico.crm && <span className="text-xs text-surface-500">— CRM/BA {tcleMedico.crm}</span>}
                   </p>
                 ) : (
-                  <p className="text-sm text-amber-700 italic">MÃ©dico nÃ£o identificado na escala do dia. Campo serÃ¡ preenchido posteriormente.</p>
+                  <p className="text-sm text-amber-700 italic">Médico não identificado na escala do dia. Campo será preenchido posteriormente.</p>
                 )}
               </div>
 
@@ -1258,30 +1223,30 @@ export default function TriagemPage() {
               <div className="border border-surface-200 rounded-lg p-3 max-h-60 overflow-y-auto bg-surface-50 text-xs text-surface-700 leading-relaxed space-y-2">
                 <p className="font-semibold text-surface-800">Eu, {tclePaciente.nome_completo}, declaro que fui informado(a) de forma clara sobre o procedimento de Escleroterapia Ecoguiada com Espuma de Polidocanol:</p>
 
-                <p><strong>I. DO PROCEDIMENTO</strong> â InjeÃ§Ã£o de Polidocanol em microespuma nas veias acometidas por varizes/insuficiÃªncia venosa crÃ´nica, guiada por ultrassom vascular (Doppler), em ambiente ambulatorial.</p>
+                <p><strong>I. DO PROCEDIMENTO</strong> — Injeção de Polidocanol em microespuma nas veias acometidas por varizes/insuficiência venosa crônica, guiada por ultrassom vascular (Doppler), em ambiente ambulatorial.</p>
 
-                <p><strong>II. ALTERNATIVAS TERAPÃUTICAS</strong> â Tratamento conservador, cirurgia convencional, ablaÃ§Ã£o tÃ©rmica por laser ou radiofrequÃªncia.</p>
+                <p><strong>II. ALTERNATIVAS TERAPÊUTICAS</strong> — Tratamento conservador, cirurgia convencional, ablação térmica por laser ou radiofrequência.</p>
 
-                <p><strong>III. RISCOS E COMPLICAÃÃES</strong> â Incluindo dor local, flebite, hiperpigmentaÃ§Ã£o, matting, equimoses, reaÃ§Ã£o alÃ©rgica, necrose cutÃ¢nea, TVP, embolia pulmonar, distÃºrbios visuais transitÃ³rios, AVC (extremamente raro).</p>
+                <p><strong>III. RISCOS E COMPLICAÇÕES</strong> — Incluindo dor local, flebite, hiperpigmentação, matting, equimoses, reação alérgica, necrose cutânea, TVP, embolia pulmonar, distúrbios visuais transitórios, AVC (extremamente raro).</p>
 
-                <p><strong>III-A. ALTERAÃÃES ESTÃTICAS</strong> â HiperpigmentaÃ§Ã£o (manchas escuras) possÃ­vel e relativamente frequente, podendo ser permanente em alguns casos.</p>
+                <p><strong>III-A. ALTERAÇÕES ESTÉTICAS</strong> — Hiperpigmentação (manchas escuras) possível e relativamente frequente, podendo ser permanente em alguns casos.</p>
 
-                <p><strong>IV. INFORMAÃÃES PRESTADAS</strong> â Declaro que prestei informaÃ§Ãµes verdadeiras sobre meu estado de saÃºde.</p>
+                <p><strong>IV. INFORMAÇÕES PRESTADAS</strong> — Declaro que prestei informações verdadeiras sobre meu estado de saúde.</p>
 
-                <p><strong>V. COMPROMISSOS PÃS-PROCEDIMENTO</strong> â Uso de meia elÃ¡stica, deambulaÃ§Ã£o precoce, evitar sol, retorno para acompanhamento.</p>
+                <p><strong>V. COMPROMISSOS PÓS-PROCEDIMENTO</strong> — Uso de meia elástica, deambulação precoce, evitar sol, retorno para acompanhamento.</p>
 
-                <p><strong>VI. INTERCORRÃNCIAS</strong> â Em caso de evento adverso, procurar equipe mÃ©dica ou urgÃªncia imediatamente.</p>
+                <p><strong>VI. INTERCORRÊNCIAS</strong> — Em caso de evento adverso, procurar equipe médica ou urgência imediatamente.</p>
 
-                <p><strong>VII. AUSÃNCIA DE GARANTIA</strong> â Sem garantia de cura completa, novas sessÃµes podem ser necessÃ¡rias.</p>
+                <p><strong>VII. AUSÊNCIA DE GARANTIA</strong> — Sem garantia de cura completa, novas sessões podem ser necessárias.</p>
 
-                <p><strong>VIII. REGISTRO DE IMAGENS</strong> â Autorizo registro fotogrÃ¡fico/vÃ­deo para documentaÃ§Ã£o clÃ­nica exclusivamente.</p>
+                <p><strong>VIII. REGISTRO DE IMAGENS</strong> — Autorizo registro fotográfico/vídeo para documentação clínica exclusivamente.</p>
 
-                <p><strong>IX. REVOGAÃÃO</strong> â Posso revogar este consentimento antes do inÃ­cio do procedimento.</p>
+                <p><strong>IX. REVOGAÇÃO</strong> — Posso revogar este consentimento antes do início do procedimento.</p>
 
-                <p><strong>X. DECLARAÃÃO FINAL</strong> â Li, compreendi e consinto de forma livre, voluntÃ¡ria e esclarecida com a realizaÃ§Ã£o do procedimento.</p>
+                <p><strong>X. DECLARAÇÃO FINAL</strong> — Li, compreendi e consinto de forma livre, voluntária e esclarecida com a realização do procedimento.</p>
 
                 <p className="text-[10px] text-surface-400 italic mt-2">
-                  FundamentaÃ§Ã£o: ResoluÃ§Ã£o CFM nÂº 2.232/2019 Â· CEM Arts. 22, 34, 59 Â· Lei 8.078/1990 Â· Lei 8.080/1990 Â· Lei 13.146/2015
+                  Fundamentação: Resolução CFM nº 2.232/2019 · CEM Arts. 22, 34, 59 · Lei 8.078/1990 · Lei 8.080/1990 · Lei 13.146/2015
                 </p>
               </div>
 
@@ -1314,7 +1279,7 @@ export default function TriagemPage() {
                 <span>Unidade: {selectedUnidade?.nome || ''}</span>
               </div>
 
-              {/* BotÃµes */}
+              {/* Botões */}
               <div className="flex items-center gap-3 pt-2 border-t border-surface-100">
                 <button
                   onClick={handleAssinarTcle}
