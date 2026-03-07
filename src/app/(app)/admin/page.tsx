@@ -143,7 +143,8 @@ export default function AdminPage() {
         cpf: '',
         cbo: '225203',
         crm: '',
-        role: 'medico'
+        role: 'medico',
+        municipio_id: '',
       });
       loadData();
     } catch (err: any) {
@@ -164,7 +165,7 @@ export default function AdminPage() {
       cbo: prof.cbo || '225203',
       crm: prof.crm || '',
       role: prof.role || 'medico',
-      municipio_id: (prof as any).municipio_id || '',
+      municipio_id: prof.municipio_id || '',
     });
     setTab('profissionais');
     setShowForm(false);
