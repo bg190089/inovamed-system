@@ -729,9 +729,9 @@ function addDopplerTemplate() {
                         </span>
                       )}
                     </h3>
-                    {atendimentoAtual?.procedimento_tipo && (
-                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${atendimentoAtual.procedimento_tipo === 'bilateral' ? 'bg-purple-100 text-purple-800' : 'bg-teal-100 text-teal-800'}`}>
-                        {atendimentoAtual.procedimento_tipo === 'bilateral' ? 'Bilateral' : 'Unilateral'}
+                    {atendimentoAtual?.procedimento?.tipo && (
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${atendimentoAtual.procedimento?.tipo === 'bilateral' ? 'bg-purple-100 text-purple-800' : 'bg-teal-100 text-teal-800'}`}>
+                        {atendimentoAtual.procedimento?.tipo === 'bilateral' ? 'Bilateral' : 'Unilateral'}
                       </span>
                     )}
                     <p className="text-sm text-surface-500 mt-0.5">
