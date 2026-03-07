@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
 
     const { data: caller } = await authSupabase
       .from('profissionais').select('role').eq('user_id', authUser.id).single();
-    if (!caller || (caller.role !== 'admin' && caller.role !== 'master')) {
+    if (!caller || caller.role !== 'admin') {
       return NextResponse.json({ error: 'Apenas administradores podem criar usuarios' }, { status: 403 });
     }
 

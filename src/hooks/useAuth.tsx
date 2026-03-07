@@ -74,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Load unidades based on role
       let unis: Unidade[] = [];
-      if (prof.role === 'admin' || prof.role === 'master' || prof.role === 'gestor') {
+      if (prof.role === 'admin' || prof.role === 'gestor') {
         const { data } = await supabase
           .from('unidades')
           .select('*, municipio:municipios(*)')
@@ -122,10 +122,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const hasRole = (role: string) => {
     if (!user) return false;
-    // 'master' has both admin and medico capabilities
-    if (user.role === 'master') {
-      return role === 'admin' || role === 'medico' || role === 'master';
-    }
     return user.role === role;
   };
 

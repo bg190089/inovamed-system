@@ -42,7 +42,7 @@ export const profissionalSchema = z.object({
   cpf: z.string().optional().default(''),
   cbo: z.string().min(1, 'CBO obrigatorio').default('225203'),
   crm: z.string().optional().default(''),
-  role: z.enum(['admin', 'gestor', 'medico', 'recepcionista', 'master']).default('medico'),
+  role: z.enum(['admin', 'gestor', 'medico', 'recepcionista']).default('medico'),
   municipio_id: z.string().optional().default(''),
 });
 

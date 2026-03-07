@@ -2,7 +2,7 @@
 // TYPES - Sistema Inovamed Escleroterapia
 // ============================================================
 
-export type UserRole = 'admin' | 'gestor' | 'medico' | 'recepcionista' | 'master';
+export type UserRole = 'admin' | 'gestor' | 'medico' | 'recepcionista';
 export type SexoType = 'M' | 'F';
 export type ProcedimentoTipo = 'unilateral' | 'bilateral';
 export type AtendimentoStatus = 'aguardando_triagem' | 'aguardando' | 'em_atendimento' | 'finalizado' | 'cancelado';
