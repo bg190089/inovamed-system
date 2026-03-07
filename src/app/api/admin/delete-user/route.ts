@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
 
     const { data: caller } = await authSupabase
       .from('profissionais').select('role').eq('user_id', authUser.id).single();
-    if (!caller || caller.role !== 'admin') {
+    if (!caller || (caller.role !== 'admin' && caller.role !== 'master')) {
       return NextResponse.json({ error: 'Apenas administradores podem excluir usuarios' }, { status: 403 });
     }
 
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
 
     if (puError) {
       console.error('Error deleting profissional_unidades:', puError);
-      return NextResponse.json({ error: `Erro ao limpar vínculos de unidades: ${puError.message}` }, { status: 400 });
+      return NextResponse.json({ error: `Erro ao limpar vÃ­nculos de unidades: ${puError.message}` }, { status: 400 });
     }
 
     // Delete from profissionais table
