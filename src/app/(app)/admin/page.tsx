@@ -48,7 +48,7 @@ export default function AdminPage() {
   if (user && !hasRole('admin') && !hasRole('master')) {
     return (
       <div className="p-6 lg:p-8 max-w-7xl mx-auto">
-        <EmptyState icon="🔒" title="Acesso Restrito" description="Voce nao tem permissao para acessar esta pagina." />
+        <EmptyState icon="ð" title="Acesso Restrito" description="Voce nao tem permissao para acessar esta pagina." />
       </div>
     );
   }
@@ -80,9 +80,9 @@ export default function AdminPage() {
         body: JSON.stringify({...result.data, municipio_id: profForm.role === 'recepcionista' ? profForm.municipio_id : undefined}),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Erro ao criar usuário');
+      if (!res.ok) throw new Error(data.error || 'Erro ao criar usuÃ¡rio');
 
-      toast.success('Usuário criado com sucesso');
+      toast.success('UsuÃ¡rio criado com sucesso');
       setProfForm({
         email: '',
         password: '',
@@ -97,7 +97,7 @@ export default function AdminPage() {
       setShowForm(false);
       loadData();
     } catch (err: any) {
-      toast.error(err.message || 'Erro ao criar usuário');
+      toast.error(err.message || 'Erro ao criar usuÃ¡rio');
     } finally {
       setLoading(false);
     }
@@ -133,7 +133,7 @@ export default function AdminPage() {
           await supabase.from('profissional_unidades').insert(unis.map(u => ({ profissional_id: editingProf.id, unidade_id: u.id })));
         }
       }
-      toast.success('Usuário atualizado com sucesso');
+      toast.success('UsuÃ¡rio atualizado com sucesso');
       setEditingProf(null);
       setProfForm({
         email: '',
@@ -148,7 +148,7 @@ export default function AdminPage() {
       });
       loadData();
     } catch (err: any) {
-      toast.error(err.message || 'Erro ao atualizar usuário');
+      toast.error(err.message || 'Erro ao atualizar usuÃ¡rio');
     } finally {
       setLoading(false);
     }
@@ -319,7 +319,7 @@ export default function AdminPage() {
     if (senha !== 'Margotti') { if (senha !== null) toast.error('Senha de confirma\u00e7\u00e3o incorreta.'); return; }
     confirm({
       title: 'Excluir Unidade',
-      description: `Tem certeza que deseja excluir permanentemente a unidade "${u.nome}" (CNES: ${u.cnes})? Esta ação não pode ser desfeita.`,
+      description: `Tem certeza que deseja excluir permanentemente a unidade "${u.nome}" (CNES: ${u.cnes})? Esta aÃ§Ã£o nÃ£o pode ser desfeita.`,
       variant: 'danger',
       confirmLabel: 'Excluir Permanentemente',
       onConfirm: async () => {
@@ -339,13 +339,13 @@ export default function AdminPage() {
             .select('id', { count: 'exact', head: true })
             .eq('unidade_id', u.id);
           if (atendCount && atendCount > 0) {
-            toast.error(`Esta unidade possui ${atendCount} atendimento(s). Não é possível excluir.`);
+            toast.error(`Esta unidade possui ${atendCount} atendimento(s). NÃ£o Ã© possÃ­vel excluir.`);
             return;
           }
           const { error } = await supabase.from('unidades').delete().eq('id', u.id);
           if (error) throw error;
           setUnidades(prev => prev.filter(x => x.id !== u.id));
-          toast.success('Unidade excluída com sucesso!');
+          toast.success('Unidade excluÃ­da com sucesso!');
         } catch (err: any) {
           toast.error(err.message || 'Erro ao excluir unidade');
         }
@@ -357,8 +357,8 @@ export default function AdminPage() {
     const senha = window.prompt('Digite a senha de confirma\u00e7\u00e3o para excluir:');
     if (senha !== 'Margotti') { if (senha !== null) toast.error('Senha de confirma\u00e7\u00e3o incorreta.'); return; }
     confirm({
-      title: 'Excluir Município',
-      description: `Tem certeza que deseja excluir permanentemente o município "${m.nome}"? Esta ação não pode ser desfeita.`,
+      title: 'Excluir MunicÃ­pio',
+      description: `Tem certeza que deseja excluir permanentemente o municÃ­pio "${m.nome}"? Esta aÃ§Ã£o nÃ£o pode ser desfeita.`,
       variant: 'danger',
       confirmLabel: 'Excluir Permanentemente',
       onConfirm: async () => {
@@ -369,15 +369,15 @@ export default function AdminPage() {
             .select('id', { count: 'exact', head: true })
             .eq('municipio_id', m.id);
           if (count && count > 0) {
-            toast.error(`Este município possui ${count} unidade(s) vinculada(s). Exclua as unidades primeiro.`);
+            toast.error(`Este municÃ­pio possui ${count} unidade(s) vinculada(s). Exclua as unidades primeiro.`);
             return;
           }
           const { error } = await supabase.from('municipios').delete().eq('id', m.id);
           if (error) throw error;
           setMunicipios(prev => prev.filter(x => x.id !== m.id));
-          toast.success('Município excluído com sucesso!');
+          toast.success('MunicÃ­pio excluÃ­do com sucesso!');
         } catch (err: any) {
-          toast.error(err.message || 'Erro ao excluir município');
+          toast.error(err.message || 'Erro ao excluir municÃ­pio');
         }
       }
     });
@@ -435,7 +435,7 @@ export default function AdminPage() {
 
   function toggleProfissional(prof: Profissional) {
     confirm({
-      title: prof.ativo ? 'Desativar Usuário' : 'Ativar Usuário',
+      title: prof.ativo ? 'Desativar UsuÃ¡rio' : 'Ativar UsuÃ¡rio',
       description: `Confirma ${prof.ativo ? 'desativacao' : 'ativacao'} de ${prof.nome_completo}?`,
       variant: prof.ativo ? 'warning' : 'default',
       confirmLabel: prof.ativo ? 'Desativar' : 'Ativar',
@@ -452,7 +452,7 @@ export default function AdminPage() {
     const senha = window.prompt('Digite a senha de confirma\u00e7\u00e3o para excluir:');
     if (senha !== 'Margotti') { if (senha !== null) toast.error('Senha de confirma\u00e7\u00e3o incorreta.'); return; }
     confirm({
-      title: 'Excluir Usuário',
+      title: 'Excluir UsuÃ¡rio',
       description: `Tem certeza que deseja excluir permanentemente o cadastro de ${prof.nome_completo}? Esta acao nao pode ser desfeita. Se o profissional possui atendimentos, prefira desativa-lo.`,
       variant: 'danger',
       confirmLabel: 'Excluir Permanentemente',
@@ -467,17 +467,17 @@ export default function AdminPage() {
             }),
           });
           const data = await res.json();
-          if (!res.ok) throw new Error(data.error || 'Erro ao excluir usuário');
+          if (!res.ok) throw new Error(data.error || 'Erro ao excluir usuÃ¡rio');
 
           if (data.warning) {
             toast.warning(data.warning);
           } else {
-            toast.success('Usuário excluído com sucesso');
+            toast.success('UsuÃ¡rio excluÃ­do com sucesso');
           }
           loadData();
           closeConfirm();
         } catch (err: any) {
-          toast.error(err.message || 'Erro ao excluir usuário');
+          toast.error(err.message || 'Erro ao excluir usuÃ¡rio');
           closeConfirm();
         }
       },
@@ -485,7 +485,7 @@ export default function AdminPage() {
   }
 
   const tabs: { key: AdminTab; label: string }[] = [
-    { key: 'profissionais', label: 'Usuários' },
+    { key: 'profissionais', label: 'UsuÃ¡rios' },
     { key: 'unidades', label: 'Unidades/CNES' },
     { key: 'municipios', label: 'Municipios' },
   ];
@@ -543,7 +543,7 @@ export default function AdminPage() {
         <div className="card p-6 mb-6">
           {editingProf && (
             <div className="space-y-4">
-              <h3 className="font-display font-semibold text-surface-800">Editar Usuário</h3>
+              <h3 className="font-display font-semibold text-surface-800">Editar UsuÃ¡rio</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="md:col-span-2">
                   <label className="input-label">E-mail</label>
@@ -583,7 +583,7 @@ export default function AdminPage() {
                     className="input-field"
                   />
                 </div>
-                {profForm.role === 'medico' && (<>
+                {(profForm.role === 'medico' || profForm.role === 'master') && (<>
                 <div>
                   <label className="input-label">CRM</label>
                   <input
@@ -621,7 +621,7 @@ export default function AdminPage() {
               <div className="flex gap-3 pt-2">
                 <button onClick={cancelEdit} className="btn-secondary">Cancelar</button>
                 <button onClick={editProfissional} disabled={loading} className="btn-primary">
-                  {loading ? 'Atualizando...' : 'Atualizar Usuário'}
+                  {loading ? 'Atualizando...' : 'Atualizar UsuÃ¡rio'}
                 </button>
               </div>
             </div>
@@ -727,7 +727,7 @@ export default function AdminPage() {
 
           {tab === 'profissionais' && !editingProf && (
             <div className="space-y-4">
-              <h3 className="font-display font-semibold text-surface-800">Novo Usuário</h3>
+              <h3 className="font-display font-semibold text-surface-800">Novo UsuÃ¡rio</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className="input-label">E-mail (login)</label>
@@ -777,7 +777,7 @@ export default function AdminPage() {
                     className="input-field"
                   />
                 </div>
-                {profForm.role === 'medico' && (<>
+                {(profForm.role === 'medico' || profForm.role === 'master') && (<>
                 <div>
                   <label className="input-label">CRM</label>
                   <input
@@ -953,8 +953,8 @@ export default function AdminPage() {
                   {profissionais.map(p => (
                     <tr key={p.id} className="table-row">
                       <td className="px-5 py-3 font-medium text-surface-800">{p.nome_completo}</td>
-                      <td className="px-5 py-3 text-surface-500 font-mono text-xs">{p.cpf || '—'}</td>
-                      <td className="px-5 py-3 text-surface-500">{p.crm || '—'}</td>
+                      <td className="px-5 py-3 text-surface-500 font-mono text-xs">{p.cpf || 'â'}</td>
+                      <td className="px-5 py-3 text-surface-500">{p.crm || 'â'}</td>
                       <td className="px-5 py-3 text-surface-500">{p.cbo}</td>
                       <td className="px-5 py-3">
                         <span className="badge bg-brand-100 text-brand-700 capitalize">{p.role}</span>
@@ -1015,7 +1015,7 @@ export default function AdminPage() {
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div>
                       <p className="text-surface-600 text-xs">CRM</p>
-                      <p className="font-medium text-surface-800">{p.crm || '—'}</p>
+                      <p className="font-medium text-surface-800">{p.crm || 'â'}</p>
                     </div>
                     <div>
                       <p className="text-surface-600 text-xs">CBO</p>
