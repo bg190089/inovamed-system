@@ -45,7 +45,7 @@ export default function AdminPage() {
   const [munForm, setMunForm] = useState({ nome: '', codigo_ibge: '', uf: 'BA' });
 
   // Role guard - redirect if not admin
-  if (user && !hasRole('admin') && !hasRole('master')) {
+  if (user && !hasRole('admin')) {
     return (
       <div className="p-6 lg:p-8 max-w-7xl mx-auto">
         <EmptyState icon="ð" title="Acesso Restrito" description="Voce nao tem permissao para acessar esta pagina." />
@@ -583,7 +583,7 @@ export default function AdminPage() {
                     className="input-field"
                   />
                 </div>
-                {(profForm.role === 'medico' || profForm.role === 'master') && (<>
+                {(profForm.role === 'medico') && (<>
                 <div>
                   <label className="input-label">CRM</label>
                   <input
@@ -777,7 +777,7 @@ export default function AdminPage() {
                     className="input-field"
                   />
                 </div>
-                {(profForm.role === 'medico' || profForm.role === 'master') && (<>
+                {(profForm.role === 'medico') && (<>
                 <div>
                   <label className="input-label">CRM</label>
                   <input
@@ -807,8 +807,7 @@ export default function AdminPage() {
                     className="input-field"
                   >
                     <option value="admin">Administrador</option>
-                    <option value="master">Master</option>
-                    <option value="medico">Medico</option>
+                                        <option value="medico">Medico</option>
                     <option value="gestor">Gestor</option>
                     <option value="recepcionista">Recepcionista</option>
                   </select>
