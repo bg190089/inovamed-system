@@ -299,6 +299,82 @@ export default function AdminPage() {
     }
   }
 
+  
+  function deleteUnidade(u: Unidade) {
+    confirm({
+      title: 'Excluir Unidade',
+      description: `Tem certeza que deseja excluir permanentemente a unidade "${u.nome}" (CNES: ${u.cnes})? Esta ação não pode ser desfeita.`,
+      variant: 'danger',
+      confirmLabel: 'Excluir Permanentemente',
+      onConfirm: async () => {
+        const senha = window.prompt('Digite a senha de confirmação para excluir:');
+        if (senha !== 'Margotti') {
+          if (senha !== null) toast.error('Senha de confirmação incorreta.');
+          return;
+        }
+        try {
+          // Check if unidade has profissionais linked
+          const { count } = await supabase
+            .from('profissional_unidades')
+            .select('id', { count: 'exact', head: true })
+            .eq('unidade_id', u.id);
+          if (count && count > 0) {
+            // Delete profissional_unidades links first
+            await supabase.from('profissional_unidades').delete().eq('unidade_id', u.id);
+          }
+          // Check for atendimentos
+          const { count: atendCount } = await supabase
+            .from('atendimentos')
+            .select('id', { count: 'exact', head: true })
+            .eq('unidade_id', u.id);
+          if (atendCount && atendCount > 0) {
+            toast.error(`Esta unidade possui ${atendCount} atendimento(s). Não é possível excluir.`);
+            return;
+          }
+          const { error } = await supabase.from('unidades').delete().eq('id', u.id);
+          if (error) throw error;
+          setUnidades(prev => prev.filter(x => x.id !== u.id));
+          toast.success('Unidade excluída com sucesso!');
+        } catch (err: any) {
+          toast.error(err.message || 'Erro ao excluir unidade');
+        }
+      }
+    });
+  }
+
+  function deleteMunicipio(m: Municipio) {
+    confirm({
+      title: 'Excluir Município',
+      description: `Tem certeza que deseja excluir permanentemente o município "${m.nome}"? Esta ação não pode ser desfeita.`,
+      variant: 'danger',
+      confirmLabel: 'Excluir Permanentemente',
+      onConfirm: async () => {
+        const senha = window.prompt('Digite a senha de confirmação para excluir:');
+        if (senha !== 'Margotti') {
+          if (senha !== null) toast.error('Senha de confirmação incorreta.');
+          return;
+        }
+        try {
+          // Check if municipio has unidades linked
+          const { count } = await supabase
+            .from('unidades')
+            .select('id', { count: 'exact', head: true })
+            .eq('municipio_id', m.id);
+          if (count && count > 0) {
+            toast.error(`Este município possui ${count} unidade(s) vinculada(s). Exclua as unidades primeiro.`);
+            return;
+          }
+          const { error } = await supabase.from('municipios').delete().eq('id', m.id);
+          if (error) throw error;
+          setMunicipios(prev => prev.filter(x => x.id !== m.id));
+          toast.success('Município excluído com sucesso!');
+        } catch (err: any) {
+          toast.error(err.message || 'Erro ao excluir município');
+        }
+      }
+    });
+  }
+
   function cancelEditUnidade() {
     setEditingUnidade(null);
     setUnidadeEditForm({ municipio_id: '', nome: '', cnes: '', endereco: '' });
@@ -371,6 +447,11 @@ export default function AdminPage() {
       variant: 'danger',
       confirmLabel: 'Excluir Permanentemente',
       onConfirm: async () => {
+        const senha = window.prompt('Digite a senha de confirmação para excluir:');
+        if (senha !== 'Margotti') {
+          if (senha !== null) toast.error('Senha de confirmação incorreta.');
+          return;
+        }
         try {
           const res = await fetch('/api/admin/delete-user', {
             method: 'POST',
@@ -993,6 +1074,12 @@ export default function AdminPage() {
                           >
                             Editar
                           </button>
+                          <button
+                            onClick={() => deleteUnidade(u)}
+                            className="text-red-600 hover:text-red-800 font-medium"
+                          >
+                            Excluir
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -1063,6 +1150,12 @@ export default function AdminPage() {
                             className="text-blue-600 hover:text-blue-800 font-medium"
                           >
                             Editar
+                          </button>
+                          <button
+                            onClick={() => deleteMunicipio(m)}
+                            className="text-red-600 hover:text-red-800 font-medium"
+                          >
+                            Excluir
                           </button>
                         </div>
                       </td>

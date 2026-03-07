@@ -39,6 +39,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Delete related records first (agendamentos, triagens assigned to this prof, etc.)
+    // Delete from profissional_unidades first (FK constraint)
+    const { error: puError } = await supabase
+      .from('profissional_unidades')
+      .delete()
+      .eq('profissional_id', profissional_id);
+
+    if (puError) {
+      console.error('Error deleting profissional_unidades:', puError);
+      return NextResponse.json({ error: `Erro ao limpar vínculos de unidades: ${puError.message}` }, { status: 400 });
+    }
+
     // Delete from profissionais table
     const { error: profError } = await supabase
       .from('profissionais')
