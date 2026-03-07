@@ -3,15 +3,15 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 // Route -> allowed roles mapping
 const ROUTE_ROLES: Record<string, string[]> = {
-  '/admin': ['admin'],
-  '/relatorios': ['admin', 'gestor'],
-  '/dashboard': ['admin', 'gestor', 'medico', 'recepcionista'],
-  '/recepcao': ['admin', 'gestor', 'recepcionista'],
-  '/consultorio': ['admin', 'gestor', 'medico'],
-  '/agendamento': ['admin', 'gestor', 'recepcionista', 'medico'],
-  '/assinatura-medico': ['admin', 'medico'],
-  '/pacientes': ['admin', 'gestor', 'medico'],
-  '/triagem': ['admin', 'gestor', 'recepcionista'],
+  '/admin': ['admin', 'master'],
+  '/relatorios': ['admin', 'gestor', 'master'],
+  '/dashboard': ['admin', 'gestor', 'medico', 'recepcionista', 'master'],
+  '/recepcao': ['admin', 'gestor', 'recepcionista', 'master'],
+  '/consultorio': ['admin', 'gestor', 'medico', 'master'],
+  '/agendamento': ['admin', 'gestor', 'recepcionista', 'medico', 'master'],
+  '/assinatura-medico': ['admin', 'medico', 'master'],
+  '/pacientes': ['admin', 'gestor', 'medico', 'master'],
+  '/triagem': ['admin', 'gestor', 'recepcionista', 'master'],
 };
 
 export async function updateSession(request: NextRequest) {
