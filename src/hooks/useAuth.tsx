@@ -1,77 +1,110 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, ReactNode, useMemo } from 'react';
-import { createClient } from '@/lib/supabase/client';
-import type { Profissional, Empresa, Unidade, UserRole } from '@/types';
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
+import { createBrowserClient } from '@supabase/ssr';
+import type { Profissional, Empresa, Unidade } from '@/types';
 
-interface AuthState {
+const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
+interface AuthContextType {
   user: Profissional | null;
   empresas: Empresa[];
   unidades: Unidade[];
   selectedEmpresa: Empresa | null;
   selectedUnidade: Unidade | null;
-  loading: boolean;
   setSelectedEmpresa: (e: Empresa) => void;
   setSelectedUnidade: (u: Unidade) => void;
-  signOut: () => Promise<void>;
-  hasRole: (...roles: UserRole[]) => boolean;
+  hasRole: (role: string) => boolean;
+  needsPasswordChange: boolean;
+  signOut: () => void;
+  loading: boolean;
 }
 
-const AuthContext = createContext<AuthState>({} as AuthState);
+const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
   const [user, setUser] = useState<Profissional | null>(null);
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [unidades, setUnidades] = useState<Unidade[]>([]);
   const [selectedEmpresa, setSelectedEmpresa] = useState<Empresa | null>(null);
   const [selectedUnidade, setSelectedUnidade] = useState<Unidade | null>(null);
+  const [needsPasswordChange, setNeedsPasswordChange] = useState(false);
   const [loading, setLoading] = useState(true);
-  const supabase = useMemo(() => createClient(), []);
 
-  useEffect(() => { loadUser(); }, []);
+  useEffect(() => {
+    loadUser();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) {
+        setUser(null);
+        router.push('/login');
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   async function loadUser() {
     try {
       const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser) { setLoading(false); return; }
+      if (!authUser) { router.push('/login'); return; }
 
       const { data: prof } = await supabase
-        .from('profissionais').select('*, empresa:empresas(*)')
-        .eq('user_id', authUser.id).single();
+        .from('profissionais')
+        .select('*, empresa:empresas(*)')
+        .eq('user_id', authUser.id)
+        .single();
 
-      if (!prof) { setLoading(false); return; }
-      setUser(prof);
+      if (!prof) { router.push('/login'); return; }
+
+      const profissional = { ...prof, email: authUser.email };
+      setUser(profissional);
+
+      // Check if user needs to change password on first login
+      if (prof.deve_trocar_senha) {
+        setNeedsPasswordChange(true);
+      }
 
       // Load empresas
       const { data: emps } = await supabase.from('empresas').select('*');
       setEmpresas(emps || []);
 
       // Load unidades based on role
-      let allUnidades: Unidade[] = [];
-      if (prof.role === 'admin' || prof.role === 'gestor') {
-        const { data } = await supabase.from('unidades').select('*, municipio:municipios(*)').eq('ativo', true);
-        allUnidades = data || [];
+      let unis: Unidade[] = [];
+      if (prof.role === 'admin' || prof.role === 'master' || prof.role === 'gestor') {
+        const { data } = await supabase
+          .from('unidades')
+          .select('*, municipio:municipios(*)')
+          .eq('ativo', true)
+          .order('nome');
+        unis = data || [];
       } else {
-        const { data: profUnidades } = await supabase
-          .from('profissional_unidades').select('unidade:unidades(*, municipio:municipios(*))')
+        const { data: links } = await supabase
+          .from('profissional_unidades')
+          .select('unidade:unidades(*, municipio:municipios(*))')
           .eq('profissional_id', prof.id);
-        allUnidades = profUnidades?.map((pu: any) => pu.unidade).filter(Boolean) || [];
+        unis = links?.map((l: any) => l.unidade).filter(Boolean) || [];
       }
-      setUnidades(allUnidades);
+      setUnidades(unis);
 
-      // Restore selections from localStorage (reuse loaded data, no duplicate query)
-      const savedEmpresa = localStorage.getItem('selected_empresa');
-      const savedUnidade = localStorage.getItem('selected_unidade');
-      if (savedEmpresa && emps) {
-        const emp = emps.find(e => e.id === savedEmpresa);
-        if (emp) setSelectedEmpresa(emp);
+      // Restore selections from localStorage
+      const savedEmpresa = localStorage.getItem('selectedEmpresa');
+      const savedUnidade = localStorage.getItem('selectedUnidade');
+
+      if (emps?.length) {
+        const emp = savedEmpresa ? emps.find(e => e.id === savedEmpresa) : emps[0];
+        setSelectedEmpresa(emp || emps[0]);
       }
-      if (savedUnidade && allUnidades.length) {
-        const uni = allUnidades.find((u: Unidade) => u.id === savedUnidade);
-        if (uni) setSelectedUnidade(uni);
+      if (unis.length) {
+        const uni = savedUnidade ? unis.find(u => u.id === savedUnidade) : unis[0];
+        setSelectedUnidade(uni || unis[0]);
       }
     } catch (err) {
-      console.error('Error loading user:', err);
+      console.error('Auth error:', err);
+      router.push('/login');
     } finally {
       setLoading(false);
     }
@@ -79,31 +112,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   function handleSetEmpresa(e: Empresa) {
     setSelectedEmpresa(e);
-    localStorage.setItem('selected_empresa', e.id);
+    localStorage.setItem('selectedEmpresa', e.id);
   }
 
   function handleSetUnidade(u: Unidade) {
     setSelectedUnidade(u);
-    localStorage.setItem('selected_unidade', u.id);
+    localStorage.setItem('selectedUnidade', u.id);
   }
+
+  const hasRole = (role: string) => {
+    if (!user) return false;
+    // 'master' has both admin and medico capabilities
+    if (user.role === 'master') {
+      return role === 'admin' || role === 'medico' || role === 'master';
+    }
+    return user.role === role;
+  };
 
   async function signOut() {
     await supabase.auth.signOut();
-    localStorage.removeItem('selected_empresa');
-    localStorage.removeItem('selected_unidade');
-    window.location.href = '/login';
-  }
-
-  function hasRole(...roles: UserRole[]) {
-    if (!user) return false;
-    return roles.includes(user.role);
+    router.push('/login');
   }
 
   return (
     <AuthContext.Provider value={{
-      user, empresas, unidades, selectedEmpresa, selectedUnidade, loading,
-      setSelectedEmpresa: handleSetEmpresa, setSelectedUnidade: handleSetUnidade,
-      signOut, hasRole,
+      user, empresas, unidades,
+      selectedEmpresa, selectedUnidade,
+      setSelectedEmpresa: handleSetEmpresa,
+      setSelectedUnidade: handleSetUnidade,
+      hasRole, needsPasswordChange, signOut, loading
     }}>
       {children}
     </AuthContext.Provider>

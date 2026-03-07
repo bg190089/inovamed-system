@@ -20,23 +20,18 @@ export const pacienteSchema = z.object({
   nome_completo: z.string().min(5, 'Nome deve ter pelo menos 5 caracteres').max(200).transform((v) => v.toUpperCase().trim()),
   sexo: z.enum(['M', 'F'], { required_error: 'Selecione o sexo' }),
   data_nascimento: z.string().min(1, 'Data de nascimento obrigatoria').refine((v) => { const d = new Date(v); return d < new Date() && d > new Date('1900-01-01'); }, 'Data invalida'),
-  cpf: z.string().min(1, 'CPF obrigatorio').transform((v) => v.replace(/\D/g, '')).refine((v) => v.length === 11, 'CPF deve ter 11 digitos').refine(isValidCPF, 'CPF invalido'),
-  cns: z.string().optional().transform((v) => v?.replace(/\D/g, '') || ''),
-  cep: z.string().optional().transform((v) => v?.replace(/\D/g, '') || ''),
+  cpf: z.string().min(1, 'CPF obrigatorio').refine((v) => isValidCPF(v), 'CPF invalido'),
+  cns: z.string().optional().default(''),
+  cep: z.string().optional().default(''),
   logradouro: z.string().optional().default(''),
   numero: z.string().optional().default(''),
   complemento: z.string().optional().default(''),
   bairro: z.string().optional().default(''),
   cidade: z.string().optional().default(''),
-  uf: z.string().max(2).default('BA'),
-  telefone: z.string().optional().transform((v) => v?.replace(/\D/g, '') || ''),
-});
-
-export const prontuarioSchema = z.object({
-  doppler: z.string().optional().default(''),
-  anamnese: z.string().optional().default(''),
-  descricao_procedimento: z.string().optional().default(''),
-  observacoes: z.string().optional().default(''),
+  uf: z.string().optional().default(''),
+  telefone: z.string().optional().default(''),
+  email: z.string().optional().default(''),
+  nome_mae: z.string().optional().default(''),
 });
 
 export const profissionalSchema = z.object({
@@ -47,24 +42,19 @@ export const profissionalSchema = z.object({
   cpf: z.string().optional().default(''),
   cbo: z.string().min(1, 'CBO obrigatorio').default('225203'),
   crm: z.string().optional().default(''),
-  role: z.enum(['admin', 'gestor', 'medico', 'recepcionista']).default('medico'),
+  role: z.enum(['admin', 'gestor', 'medico', 'recepcionista', 'master']).default('medico'),
+  municipio_id: z.string().optional().default(''),
 });
 
 export const unidadeSchema = z.object({
-  municipio_id: z.string().uuid('Selecione o municipio'),
+  municipio_id: z.string().uuid('Selecione um municipio'),
   nome: z.string().min(3, 'Nome da unidade obrigatorio'),
-  cnes: z.string().length(7, 'CNES deve ter 7 digitos'),
+  cnes: z.string().min(1, 'CNES obrigatorio'),
   endereco: z.string().optional().default(''),
 });
 
 export const municipioSchema = z.object({
   nome: z.string().min(2, 'Nome do municipio obrigatorio'),
-  codigo_ibge: z.string().optional().default(''),
-  uf: z.string().max(2).default('BA'),
+  codigo_ibge: z.string().min(7, 'Codigo IBGE invalido').max(7),
+  uf: z.string().length(2, 'UF deve ter 2 caracteres'),
 });
-
-export type PacienteFormData = z.infer<typeof pacienteSchema>;
-export type ProntuarioFormData = z.infer<typeof prontuarioSchema>;
-export type ProfissionalFormData = z.infer<typeof profissionalSchema>;
-export type UnidadeFormData = z.infer<typeof unidadeSchema>;
-export type MunicipioFormData = z.infer<typeof municipioSchema>;

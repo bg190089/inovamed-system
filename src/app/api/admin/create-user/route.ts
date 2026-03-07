@@ -3,25 +3,23 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    // Verify caller is authenticated admin
     const authSupabase = createServerSupabase();
     const { data: { user: authUser } } = await authSupabase.auth.getUser();
     if (!authUser) return NextResponse.json({ error: 'Nao autorizado' }, { status: 401 });
 
     const { data: caller } = await authSupabase
       .from('profissionais').select('role').eq('user_id', authUser.id).single();
-    if (!caller || caller.role !== 'admin') {
+    if (!caller || (caller.role !== 'admin' && caller.role !== 'master')) {
       return NextResponse.json({ error: 'Apenas administradores podem criar usuarios' }, { status: 403 });
     }
 
-    const { email, password, nome_completo, cns, cpf, cbo, crm, role } = await request.json();
+    const { email, password, nome_completo, cns, cpf, cbo, crm, role, municipio_id } = await request.json();
     if (!email || !password || !nome_completo) {
       return NextResponse.json({ error: 'Email, senha e nome sao obrigatorios' }, { status: 400 });
     }
 
     const supabase = createServiceClient();
 
-    // Create auth user via Admin API (does not affect caller's session)
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email, password, email_confirm: true,
     });
@@ -30,23 +28,46 @@ export async function POST(request: NextRequest) {
     const { data: empresas } = await supabase.from('empresas').select('id').limit(1);
     const empresaId = empresas?.[0]?.id;
 
-    const { error: profError } = await supabase.from('profissionais').insert({
+    const { data: profData, error: profError } = await supabase.from('profissionais').insert({
       user_id: authData.user.id,
       nome_completo: nome_completo.toUpperCase(),
-      cns: cns || null, cpf: cpf || null, cbo: cbo || '225203',
-      crm: crm || null, role: role || 'medico', empresa_id: empresaId,
-    });
+      cns: cns || null,
+      cpf: cpf || null,
+      cbo: cbo || '225203',
+      crm: crm || null,
+      role: role || 'medico',
+      empresa_id: empresaId,
+      municipio_id: municipio_id || null,
+      deve_trocar_senha: true,
+    }).select('id').single();
     if (profError) return NextResponse.json({ error: profError.message }, { status: 400 });
+
+    // If role is 'recepcionista' and municipio_id provided, link to all unidades of that municipio
+    if (role === 'recepcionista' && municipio_id && profData) {
+      const { data: unidades } = await supabase
+        .from('unidades')
+        .select('id')
+        .eq('municipio_id', municipio_id)
+        .eq('ativo', true);
+
+      if (unidades && unidades.length > 0) {
+        const links = unidades.map((u) => ({
+          profissional_id: profData.id,
+          unidade_id: u.id,
+        }));
+
+        await supabase.from('profissional_unidades').insert(links);
+      }
+    }
 
     // Send welcome email (non-blocking)
     try {
-      await fetch(new URL('/api/admin/send-welcome-email', request.url), {
+      await fetch(new URL('/api/admin/send-welcome-email', request.url).toString(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, nome_completo }),
       });
     } catch (emailErr) {
-      // Log error but don't fail the user creation
       console.error('Failed to send welcome email:', emailErr);
     }
 
