@@ -54,7 +54,7 @@ export class AtendimentoService {
   }
 
   async getMedicos(): Promise<Profissional[]> {
-    const { data } = await this.supabase.from('profissionais').select('*').eq('role', 'medico').eq('ativo', true);
+    const { data } = await this.supabase.from('profissionais').select('*').in('role', ['medico', 'master']).eq('ativo', true).not('crm', 'is', null);
     return data || [];
   }
 
