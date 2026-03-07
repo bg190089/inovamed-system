@@ -124,7 +124,7 @@ export default function ConsultorioPage() {
       loadFilaUnidade();
 
       // Refresh wait times every minute
-      const interval = setInterval(() => setRefreshKey(k => k + 1), 60000);
+      const interval = setInterval(() => setRefreshKey(k => k + 1), 10000);
 
       const channel = supabase
         .channel('consultorio-rt')
@@ -157,7 +157,7 @@ export default function ConsultorioPage() {
     finalizados.forEach(a => {
       if (a.hora_chegada && a.hora_inicio_atendimento) {
         const waitMs = new Date(a.hora_inicio_atendimento).getTime() - new Date(a.hora_chegada).getTime();
-        avgWait += waitMs / 60000;
+        avgWait += waitMs / 10000;
         countWithTimes++;
       }
     });
@@ -728,12 +728,12 @@ function addDopplerTemplate() {
                           Sessão {sessoesPaciente} de 4
                         </span>
                       )}
-                    {selectedAtend?.procedimento_tipo && (
-                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${selectedAtend.procedimento_tipo === 'bilateral' ? 'bg-purple-100 text-purple-800' : 'bg-teal-100 text-teal-800'}`}>
-                        {selectedAtend.procedimento_tipo === 'bilateral' ? 'Bilateral' : 'Unilateral'}
+                    </h3>
+                    {atendimentoAtual?.procedimento_tipo && (
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${atendimentoAtual.procedimento_tipo === 'bilateral' ? 'bg-purple-100 text-purple-800' : 'bg-teal-100 text-teal-800'}`}>
+                        {atendimentoAtual.procedimento_tipo === 'bilateral' ? 'Bilateral' : 'Unilateral'}
                       </span>
                     )}
-                    </h3>
                     <p className="text-sm text-surface-500 mt-0.5">
                       {calcularIdade(atendimentoAtual.paciente?.data_nascimento || '')} anos •{' '}
                       {atendimentoAtual.paciente?.sexo === 'F' ? 'Feminino' : 'Masculino'} • CPF:{' '}

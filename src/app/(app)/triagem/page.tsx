@@ -61,7 +61,6 @@ export default function TriagemPage() {
   const [historico, setHistorico] = useState<Triagem[]>([]);
   const [showHistorico, setShowHistorico] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [sessoesPaciente, setSessoesPaciente] = useState(0);
   const [saving, setSaving] = useState(false);
   const [medicos, setMedicos] = useState<Profissional[]>([]);
   const [procedimentos, setProcedimentos] = useState<any[]>([]);
@@ -112,19 +111,6 @@ export default function TriagemPage() {
     if (selectedUnidade) {
       loadFila();
       atendimentoService.getMedicos().then(setMedicos);
-
-  // Contar sessões do paciente
-  useEffect(() => {
-    const pacId = selectedAtend?.paciente_id || pacienteAvulso?.id;
-    if (!pacId) { setSessoesPaciente(0); return; }
-    (async () => {
-      const count12 = await AtendimentoService.contarSessoes12Meses(supabase, pacId);
-      const pac = selectedAtend?.paciente || pacienteAvulso;
-      const ant = pac?.sessoes_anteriores?.length || 0;
-      setSessoesPaciente(count12 + ant);
-    })();
-  }, [selectedAtend, pacienteAvulso, supabase]);
-
       agendamentoService.getProcedimentos().then(setProcedimentos);
       // Realtime
       const channel = supabase

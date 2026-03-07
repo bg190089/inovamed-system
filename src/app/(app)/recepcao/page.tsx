@@ -61,7 +61,6 @@ export default function RecepcaoPage() {
   const [procedimentos, setProcedimentos] = useState<Procedimento[]>([]);
   const [profissionais, setProfissionais] = useState<Profissional[]>([]);
   const [loading, setLoading] = useState(false);
-  const [sessoesPaciente, setSessoesPaciente] = useState(0);
   const [selectedProc, setSelectedProc] = useState('');
   const [selectedProf, setSelectedProf] = useState('');
   const [isNewPatient, setIsNewPatient] = useState(false);
@@ -115,17 +114,6 @@ export default function RecepcaoPage() {
       atendimentoService.getProcedimentos().then(setProcedimentos);
       atendimentoService.getMedicos().then(setProfissionais);
       loadFila();
-
-  // Contar sessões do paciente selecionado
-  useEffect(() => {
-    if (!selectedPaciente) { setSessoesPaciente(0); return; }
-    (async () => {
-      const count12 = await AtendimentoService.contarSessoes12Meses(supabase, selectedPaciente.id);
-      const ant = selectedPaciente.sessoes_anteriores?.length || 0;
-      setSessoesPaciente(count12 + ant);
-    })();
-  }, [selectedPaciente, supabase]);
-
 
       // Filtered realtime subscription
       const channel = supabase
