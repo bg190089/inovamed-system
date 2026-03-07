@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'Inovamed <noreply@inovamed.com.br>';
+const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'Inovamed <onboarding@resend.dev>';
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://inovamed-system.vercel.app';
 
 export async function POST(request: NextRequest) {
