@@ -4,7 +4,7 @@ import type { Atendimento, Procedimento, Profissional } from '@/types';
 const FULL_SELECT = '*, paciente:pacientes(*), profissional:profissionais(*), procedimento:procedimentos(*), unidade:unidades(*, municipio:municipios(*))';
 
 // Lighter select for list views (polling) - no unidade join since already known from context
-const LIST_SELECT = '*, paciente:pacientes(id, nome, cpf, data_nascimento, sexo, cns), profissional:profissionais(id, nome), procedimento:procedimentos(id, nome, tipo, codigo_sus)';
+const LIST_SELECT = '*, paciente:pacientes(id, nome_completo, cpf, data_nascimento, sexo, cns), profissional:profissionais(id, nome_completo), procedimento:procedimentos(id, descricao, tipo, codigo_sus)';
 
 export class AtendimentoService {
   constructor(private supabase: SupabaseClient) {}
@@ -54,7 +54,7 @@ export class AtendimentoService {
   }
 
   async getMedicos(): Promise<Profissional[]> {
-    const { data } = await this.supabase.from('profissionais').select('*').in('role', ['medico', 'master']).eq('ativo', true).not('crm', 'is', null);
+    const { data } = await this.supabase.from('profissionais').select('*').eq('role', 'medico').eq('ativo', true);
     return data || [];
   }
 
@@ -86,7 +86,7 @@ export class AtendimentoService {
     try {
       await this.supabase.rpc('incrementar_reabertura', { p_atendimento_id: id });
     } catch {
-      // RPC may not exist yet — ignore
+      // RPC may not exist yet â ignore
     }
   }
 
