@@ -952,8 +952,8 @@ export default function AdminPage() {
                   {profissionais.map(p => (
                     <tr key={p.id} className="table-row">
                       <td className="px-5 py-3 font-medium text-surface-800">{p.nome_completo}</td>
-                      <td className="px-5 py-3 text-surface-500 font-mono text-xs">{p.cpf || 'â'}</td>
-                      <td className="px-5 py-3 text-surface-500">{p.crm || 'â'}</td>
+                      <td className="px-5 py-3 text-surface-500 font-mono text-xs">{p.cpf || '—'}</td>
+                      <td className="px-5 py-3 text-surface-500">{p.crm || '—'}</td>
                       <td className="px-5 py-3 text-surface-500">{p.cbo}</td>
                       <td className="px-5 py-3">
                         <span className="badge bg-brand-100 text-brand-700 capitalize">{p.role}</span>
@@ -1014,7 +1014,7 @@ export default function AdminPage() {
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div>
                       <p className="text-surface-600 text-xs">CRM</p>
-                      <p className="font-medium text-surface-800">{p.crm || 'â'}</p>
+                      <p className="font-medium text-surface-800">{p.crm || '—'}</p>
                     </div>
                     <div>
                       <p className="text-surface-600 text-xs">CBO</p>
